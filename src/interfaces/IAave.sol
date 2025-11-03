@@ -9,24 +9,15 @@ interface IPool {
      * @param onBehalfOf Address that will receive the aTokens
      * @param referralCode Referral code (use 0)
      */
-    function supply(
-        address asset,
-        uint256 amount,
-        address onBehalfOf,
-        uint16 referralCode
-    ) external;
-    
+    function supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode) external;
+
     /**
      * @notice Withdraw assets from Aave
      * @param asset The address of the underlying asset
      * @param amount The amount to withdraw (use type(uint256).max for all)
      * @param to Address that will receive the assets
      */
-    function withdraw(
-        address asset,
-        uint256 amount,
-        address to
-    ) external returns (uint256);
+    function withdraw(address asset, uint256 amount, address to) external returns (uint256);
 }
 
 interface IPoolDataProvider {
