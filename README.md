@@ -29,7 +29,7 @@ The AAVE Autopilot Vault provides a simple interface for users to deposit USDC, 
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/aave-autopilot.git
+git clone https://github.com/Moses-main/aave-autopilot.git
 cd aave-autopilot
 
 # Install dependencies
