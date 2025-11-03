@@ -4,6 +4,8 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./interfaces/IAave.sol";
+
 
 /**
  * @title AaveAutopilot
@@ -22,6 +24,11 @@ contract AaveAutopilot is ERC4626, Ownable {
     
     /// @notice Total assets deposited by all users
     uint256 private _totalAssets;
+
+    IPool public immutable aavePool;
+    IPoolDataProvider public immutable aaveDataProvider;
+    IAToken public immutable aToken;
+
     
     // ============ Events ============
     
@@ -34,25 +41,37 @@ contract AaveAutopilot is ERC4626, Ownable {
      * @param asset The underlying asset (e.g., USDC)
      * @param vaultName Name of the vault token
      * @param vaultSymbol Symbol of the vault token
+     * @param aavePool The Aave v3 pool address
+     * @param aaveDataProvider The Aave v3 data provider address
+     * @param aToken The Aave v3 aToken address
      */
     constructor(
         IERC20 asset,
         string memory vaultName,
-        string memory vaultSymbol
-    ) ERC4626(asset) ERC20(vaultName, vaultSymbol) Ownable(msg.sender) {}
+        string memory vaultSymbol,
+        address _aavePool,
+        address _aaveDataProvider,
+        address _aToken
+    ) ERC4626(asset) ERC20(vaultName, vaultSymbol) Ownable(msg.sender) {
+        aavePool = IPool(_aavePool);
+        aaveDataProvider = IPoolDataProvider(_aaveDataProvider);
+        aToken = IAToken(_aToken);
+    }
     
     // ============ Core ERC-4626 Functions ============
     
     /**
      * @notice Total assets managed by the vault
      */
+    // Update totalAssets to get real balance from Aave
     function totalAssets() public view override returns (uint256) {
-        return _totalAssets;
+        return aToken.balanceOf(address(this)); // Real-time balance with interest
     }
     
     /**
      * @notice Deposit assets into the vault
      */
+   // Update _deposit function
     function _deposit(
         address caller,
         address receiver,
@@ -62,12 +81,18 @@ contract AaveAutopilot is ERC4626, Ownable {
         super._deposit(caller, receiver, assets, shares);
         _totalAssets += assets;
         
-        // TODO: Supply to Aave (Day 2)
+        // Supply to Aave
+        IERC20(asset()).approve(address(aavePool), assets);
+        aavePool.supply(asset(), assets, address(this), 0);
+        
+        emit Deposited(caller, receiver, assets, shares);
     }
+
     
     /**
      * @notice Withdraw assets from the vault
      */
+    // Update _withdraw function
     function _withdraw(
         address caller,
         address receiver,
@@ -75,11 +100,15 @@ contract AaveAutopilot is ERC4626, Ownable {
         uint256 assets,
         uint256 shares
     ) internal override {
-        // TODO: Withdraw from Aave (Day 2)
+        // Withdraw from Aave
+        aavePool.withdraw(asset(), assets, address(this));
         
         super._withdraw(caller, receiver, owner, assets, shares);
         _totalAssets -= assets;
+        
+        emit Withdrawn(caller, receiver, owner, assets, shares);
     }
+
     
     // ============ Health Factor Management (Day 3) ============
     
