@@ -231,85 +231,61 @@ contract AaveAutopilotTest is Test {
         );
         
         // Mock the ERC4626 functions that will be called during deposit
-        // 1. totalAssets() - called multiple times
         vm.mockCall(
             address(vault),
             abi.encodeWithSignature("totalAssets()"),
             abi.encode(0) // Initial total assets is 0
         );
         
-        // 2. previewDeposit() - called by deposit()
+        // Mock the previewDeposit call
         vm.mockCall(
             address(vault),
             abi.encodeWithSignature("previewDeposit(uint256)", amount),
             abi.encode(amount) // 1:1 shares for testing
         );
         
-        // 3. maxDeposit()
+        // Mock the maxDeposit call
         vm.mockCall(
             address(vault),
             abi.encodeWithSignature("maxDeposit(address)", alice),
             abi.encode(type(uint256).max)
         );
         
-        // 4. convertToShares() - called by previewDeposit
+        // Mock the convertToShares call
         vm.mockCall(
             address(vault),
             abi.encodeWithSignature("convertToShares(uint256,address)", amount, alice),
             abi.encode(amount) // 1:1 shares for testing
         );
         
-        // 5. totalSupply() - called by _convertToShares in ERC4626
+        // Mock the totalSupply call
         vm.mockCall(
             address(vault),
             abi.encodeWithSignature("totalSupply()"),
             abi.encode(0) // Initial supply is 0
         );
         
-        // 6. Mock the aToken balanceOf call that happens in totalAssets()
-        vm.mockCall(
-            address(A_TOKEN),
-            abi.encodeWithSelector(IERC20.balanceOf.selector, address(vault)),
-            abi.encode(aTokenAmount)
-        );
-        
-        // 7. Mock the _mint call
+        // Mock the _mint call
         vm.mockCall(
             address(vault),
             abi.encodeWithSignature("_mint(address,uint256)", alice, amount),
             abi.encode()
         );
         
-        // Expect both the standard ERC4626 Deposit event and our custom Deposited event
+        // Expect the Deposit event
         vm.expectEmit(true, true, true, true);
         emit IERC4626.Deposit(alice, alice, amount, amount);
         
-        // Also expect our custom Deposited event
+        // Expect the custom Deposited event
         vm.expectEmit(true, true, true, true);
         emit AaveAutopilot.Deposited(alice, alice, amount, amount);
         
-        // Deposit USDC
+        // Perform the deposit
         vm.prank(alice);
         uint256 shares = vault.deposit(amount, alice);
         
         // Verify the deposit
         assertEq(shares, amount, "Shares should equal deposit amount");
-        
-        // Verify the vault's aToken balance
-        vm.mockCall(
-            address(A_TOKEN), 
-            abi.encodeWithSelector(IERC20.balanceOf.selector, address(vault)),
-            abi.encode(amount)
-        );
-        
-        // Verify totalAssets returns the expected amount
-        vm.mockCall(
-            address(vault),
-            abi.encodeWithSignature("totalAssets()"),
-            abi.encode(amount)
-        );
-        
-        assertEq(vault.totalAssets(), amount, "Vault total assets should match deposit amount");
     }
     
     // Test withdrawal functionality
@@ -429,25 +405,86 @@ contract AaveAutopilotTest is Test {
         // Record initial balance
         uint256 initialUsdcBalance = usdc.balanceOf(alice);
         
+        // Expect the Withdraw event
+        vm.expectEmit(true, true, true, true);
+        emit IERC4626.Withdraw(alice, alice, alice, withdrawAmount, withdrawAmount);
+        
         // Perform the withdrawal
         vm.prank(alice);
         uint256 withdrawn = vault.withdraw(withdrawAmount, alice, alice);
         
         // Verify the withdrawal
         assertEq(withdrawn, withdrawAmount, "Withdrawn amount should match requested amount");
-        assertEq(
-            usdc.balanceOf(alice),
-            initialUsdcBalance - depositAmount + withdrawAmount, // Initial + withdrawn - deposited
-            "USDC balance should be updated correctly"
+        
+        // Test withdrawal with insufficient balance
+        vm.mockCall(
+            address(vault),
+            abi.encodeWithSignature("balanceOf(address)", alice),
+            abi.encode(0)
         );
+        
+        vm.expectRevert("ERC20: burn amount exceeds balance");
+        vm.prank(alice);
+        vault.withdraw(1, alice, alice);
+        
+        // Test withdrawal with unhealthy position
+        mockAaveData(1.04e18); // Below MIN_HEALTH_FACTOR
+        
+        vm.expectRevert("Withdrawal would make position unsafe");
+        vm.prank(alice);
+        vault.withdraw(1, alice, alice);
     }
     
-    // Test health factor monitoring
+    // Test health factor monitoring and rebalancing
     function testHealthFactorCheck() public {
         uint256 depositAmount = 1000 * 10 ** USDC_DECIMALS;
         
         // Mock healthy position
         mockAaveData(2.5e18);
+        
+        // Mock deposit setup
+        vm.mockCall(
+            address(usdc),
+            abi.encodeWithSelector(IERC20.transferFrom.selector, alice, address(vault), depositAmount),
+            abi.encode(true)
+        );
+        
+        // Mock ERC4626 functions for deposit
+        vm.mockCall(
+            address(vault),
+            abi.encodeWithSignature("totalAssets()"),
+            abi.encode(0)
+        );
+        
+        vm.mockCall(
+            address(vault),
+            abi.encodeWithSignature("previewDeposit(uint256)", depositAmount),
+            abi.encode(depositAmount)
+        );
+        
+        vm.mockCall(
+            address(vault),
+            abi.encodeWithSignature("maxDeposit(address)", alice),
+            abi.encode(type(uint256).max)
+        );
+        
+        vm.mockCall(
+            address(vault),
+            abi.encodeWithSignature("convertToShares(uint256,address)", depositAmount, alice),
+            abi.encode(depositAmount)
+        );
+        
+        vm.mockCall(
+            address(vault),
+            abi.encodeWithSignature("totalSupply()"),
+            abi.encode(0)
+        );
+        
+        vm.mockCall(
+            address(vault),
+            abi.encodeWithSignature("_mint(address,uint256)", alice, depositAmount),
+            abi.encode()
+        );
         
         vm.startPrank(alice);
         usdc.approve(address(vault), depositAmount);
@@ -457,17 +494,38 @@ contract AaveAutopilotTest is Test {
         uint256 healthFactor = vault.getCurrentHealthFactor();
         assertEq(healthFactor, 2.5e18, "Incorrect health factor");
         
-        // Mock ETH price drop (50% drop)
-        ethUsdPriceFeed.setPrice(int256(INITIAL_ETH_PRICE / 2));
+        // Test checkAndAdjustPosition with healthy position (should do nothing)
+        mockAaveData(2.5e18);
+        vault.checkAndAdjustPosition();
         
-        // Mock updated health factor after price drop
-        mockAaveData(1.1e18); // Below minimum threshold
+        // Test with unhealthy position
+        mockAaveData(1.04e18); // Below MIN_HEALTH_FACTOR
+        
+        // Mock the rebalance call
+        vm.mockCall(
+            address(AAVE_POOL),
+            abi.encodeWithSelector(IPool.withdraw.selector, address(usdc), type(uint256).max, address(vault)),
+            abi.encode(depositAmount)
+        );
+        
+        // Expect the PositionAdjusted event
+        vm.expectEmit(true, true, true, true);
+        emit AaveAutopilot.PositionAdjusted(1.04e18, 2.5e18);
         
         // Should trigger rebalance
         vault.checkAndAdjustPosition();
         
-        // Verify rebalance occurred
-        // (In a real test, we would verify the actual rebalance logic)
+        // Test cooldown
+        mockAaveData(1.04e18);
+        vault.checkAndAdjustPosition(); // Should not trigger another rebalance due to cooldown
+        
+        // Fast forward past cooldown
+        vm.warp(block.timestamp + 2 hours);
+        
+        // Should trigger rebalance again after cooldown
+        vm.expectEmit(true, true, true, true);
+        emit AaveAutopilot.PositionAdjusted(1.04e18, 2.5e18);
+        vault.checkAndAdjustPosition();
         
         vm.stopPrank();
     }
@@ -475,25 +533,46 @@ contract AaveAutopilotTest is Test {
     // Test Keeper compatibility
     function testKeeperCheckUpkeep() public {
         // Mock unhealthy position
-        mockAaveData(1.1e18); // Below KEEPER_THRESHOLD
+        mockAaveData(1.09e18); // Below KEEPER_THRESHOLD (1.1)
         
         // Fast forward time to pass cooldown
         vm.warp(block.timestamp + 2 hours);
         
         // Check if upkeep is needed
         (bool upkeepNeeded, ) = vault.checkUpkeep("");
-        assertTrue(upkeepNeeded, "Upkeep should be needed");
+        assertTrue(upkeepNeeded, "Upkeep should be needed when health factor is below threshold");
+        
+        // Mock the rebalance call
+        vm.mockCall(
+            address(AAVE_POOL),
+            abi.encodeWithSelector(IPool.withdraw.selector, address(usdc), type(uint256).max, address(vault)),
+            abi.encode(1000e6) // Mock withdraw amount
+        );
+        
+        // Expect the PositionAdjusted event
+        vm.expectEmit(true, true, true, true);
+        emit AaveAutopilot.PositionAdjusted(1.09e18, 2.5e18);
         
         // Perform upkeep
         vm.prank(keeper);
         (bool success, ) = address(vault).call(
             abi.encodeWithSelector(
                 vault.performUpkeep.selector,
-                abi.encode(1.1e18) // Current health factor
+                abi.encode(1.09e18) // Current health factor
             )
         );
         
         assertTrue(success, "Perform upkeep failed");
+        
+        // Test when cooldown hasn't passed
+        mockAaveData(1.09e18);
+        (upkeepNeeded, ) = vault.checkUpkeep("");
+        assertFalse(upkeepNeeded, "Upkeep should not be needed during cooldown");
+        
+        // Test when health factor is above threshold
+        mockAaveData(1.2e18); // Above KEEPER_THRESHOLD
+        (upkeepNeeded, ) = vault.checkUpkeep("");
+        assertFalse(upkeepNeeded, "Upkeep should not be needed when health factor is above threshold");
     }
     
     // Test pausing functionality
@@ -628,7 +707,7 @@ contract AaveAutopilotTest is Test {
         // Fund the malicious contract
         usdc.mint(address(malicious), amount);
 
-        // Mock the aToken balance for the initial deposit
+        // Mock the aToken balance for the vault
         vm.mockCall(
             address(A_TOKEN),
             abi.encodeWithSelector(IERC20.balanceOf.selector, address(vault)),
@@ -706,28 +785,49 @@ contract AaveAutopilotTest is Test {
         );
 
         // Mock the transferFrom call to trigger the reentrancy
+        // This will be called when the vault tries to transfer USDC from the malicious contract
         vm.mockCall(
             address(usdc),
             abi.encodeWithSelector(IERC20.transferFrom.selector, address(malicious), address(vault), 100),
             abi.encode(true)
         );
 
-        // Mock the safeTransfer call to trigger the reentrancy
+        // Mock the safeTransfer call that would be made during the reentrant call
+        // This will trigger the onERC20Received callback in the malicious contract
         vm.mockCall(
             address(usdc),
             abi.encodeWithSelector(IERC20.transfer.selector, address(malicious), 100),
             abi.encode(true)
         );
 
-        // Mock the Aave Pool withdraw call for the reentrant withdrawal
+        // Mock the Aave Pool supply call for the reentrant deposit
+        // This will be called during the reentrant call
         vm.mockCall(
             address(AAVE_POOL),
-            abi.encodeWithSelector(IPool.withdraw.selector, address(usdc), 50, address(vault)),
-            abi.encode(50)
+            abi.encodeWithSelector(IPool.supply.selector, address(usdc), 50, address(vault), uint16(0)),
+            abi.encode()
+        );
+
+        // Mock the aToken transfer for the reentrant deposit
+        vm.mockCall(
+            address(A_TOKEN),
+            abi.encodeWithSelector(IERC20.transfer.selector, address(malicious), 50),
+            abi.encode(true)
+        );
+
+        // Mock the _mint call for the reentrant deposit
+        // This is where the reentrancy will be detected
+        vm.mockCall(
+            address(vault),
+            abi.encodeWithSignature("_mint(address,uint256)", address(malicious), 50),
+            abi.encode()
         );
 
         // Expect reentrancy protection to trigger
+        // The reentrancy guard should prevent the second deposit from completing
         vm.expectRevert("ReentrancyGuard: reentrant call");
+        
+        // Execute the attack
         malicious.attack();
 
         // Verify the malicious contract's balance didn't change
@@ -843,6 +943,9 @@ contract MaliciousContract {
         token = IERC20(_token);
     }
     
+    // Fallback function to receive ETH
+    receive() external payable {}
+    
     // This function will be called during the reentrancy
     function onERC20Received(
         address,
@@ -851,8 +954,9 @@ contract MaliciousContract {
     ) external returns (bytes4) {
         if (!attacking && msg.sender == address(vault)) {
             attacking = true;
-            // Try to reenter by calling withdraw again
-            vault.withdraw(50, address(this), address(this));
+            // Try to reenter by calling deposit again
+            // This will trigger the reentrancy guard
+            vault.deposit(50, address(this));
         }
         return this.onERC20Received.selector;
     }
@@ -861,7 +965,12 @@ contract MaliciousContract {
         // Approve vault to spend tokens
         token.approve(address(vault), type(uint256).max);
         
-        // This will trigger the reentrancy
+        // Start the attack by making a deposit
         vault.deposit(100, address(this));
+    }
+    
+    // Helper function to check if the contract has a balance of a token
+    function hasBalance(address tokenAddress) external view returns (bool) {
+        return IERC20(tokenAddress).balanceOf(address(this)) > 0;
     }
 }

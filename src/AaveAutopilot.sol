@@ -18,14 +18,14 @@ import "./interfaces/KeeperCompatibleInterface.sol";
 contract AaveAutopilot is ERC4626, Ownable, ReentrancyGuard, Pausable, KeeperCompatibleInterface {
     // ============ State Variables ============
 
-    /// @notice Minimum health factor before triggering auto-adjustment (1.5x)
-    uint256 public constant MIN_HEALTH_FACTOR = 1.5e18;
+    /// @notice Minimum health factor before triggering auto-adjustment (1.05x)
+    uint256 public constant MIN_HEALTH_FACTOR = 1.05e18;
 
-    /// @notice Target health factor after rebalancing (2.0x)
-    uint256 public constant TARGET_HEALTH_FACTOR = 2e18;
+    /// @notice Target health factor after rebalancing (1.5x)
+    uint256 public constant TARGET_HEALTH_FACTOR = 1.5e18;
 
-    /// @notice Health factor threshold for Keeper check (1.8x)
-    uint256 public constant KEEPER_THRESHOLD = 1.8e18;
+    /// @notice Health factor threshold for Keeper check (1.1x)
+    uint256 public constant KEEPER_THRESHOLD = 1.1e18;
 
     /// @notice Chainlink ETH/USD price feed
     AggregatorV3Interface public immutable ethUsdPriceFeed;
@@ -186,6 +186,11 @@ contract AaveAutopilot is ERC4626, Ownable, ReentrancyGuard, Pausable, KeeperCom
      * @return upkeepNeeded Whether upkeep is needed
      * @return performData Encoded data for the performUpkeep call
      */
+    /**
+     * @notice Check if the position needs rebalancing
+     * @return upkeepNeeded Whether upkeep is needed
+     * @return performData Encoded data for the performUpkeep call
+     */
     function checkUpkeep(
         bytes calldata /* checkData */
     ) 
@@ -197,10 +202,16 @@ contract AaveAutopilot is ERC4626, Ownable, ReentrancyGuard, Pausable, KeeperCom
         uint256 healthFactor = getCurrentHealthFactor();
         bool timePassed = block.timestamp - lastRebalanceTimestamp >= REBALANCE_COOLDOWN;
         
-        upkeepNeeded = (healthFactor < KEEPER_THRESHOLD * 1e18) && timePassed;
+        upkeepNeeded = (healthFactor < KEEPER_THRESHOLD) && timePassed;
         performData = abi.encode(healthFactor);
+        
+        return (upkeepNeeded, performData);
     }
     
+    /**
+     * @notice Perform the rebalancing if needed
+     * @param performData Encoded data from checkUpkeep
+     */
     /**
      * @notice Perform the rebalancing if needed
      * @param performData Encoded data from checkUpkeep
@@ -210,13 +221,19 @@ contract AaveAutopilot is ERC4626, Ownable, ReentrancyGuard, Pausable, KeeperCom
     ) 
         external 
         override 
+        whenNotPaused
     {
         (uint256 healthFactor) = abi.decode(performData, (uint256));
-        require(healthFactor < KEEPER_THRESHOLD * 1e18, "Health factor above threshold");
-        require(block.timestamp - lastRebalanceTimestamp >= REBALANCE_COOLDOWN, "Cooldown not met");
+        require(healthFactor < KEEPER_THRESHOLD, "Health factor above threshold");
+        require(
+            block.timestamp - lastRebalanceTimestamp >= REBALANCE_COOLDOWN, 
+            "Cooldown not met"
+        );
         
         lastRebalanceTimestamp = block.timestamp;
         _rebalancePosition(healthFactor);
+        
+        emit PositionAdjusted(healthFactor, getCurrentHealthFactor());
     }
     
     /**
