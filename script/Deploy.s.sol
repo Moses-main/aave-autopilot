@@ -7,10 +7,10 @@ import "../src/AaveAutopilot.sol";
 contract DeployScript is Script {
     // Base Sepolia addresses
     address constant USDC = 0x036CbD53842c5426634e7929541eC2318f3dCF7e; // Base Sepolia USDC
-    address constant AAVE_POOL = 0x6dcb6d1e0d487edae6b45d1d1b86e1a4ad8d4a2c; // Base Sepolia Aave Pool
+    address constant AAVE_POOL = 0x6dcb6D1E0D487EDAE6B45D1d1B86e1A4AD8d4a2C; // Base Sepolia Aave Pool
     address constant AAVE_DATA_PROVIDER = 0x2d8A3C5677189723C4cB8873CfC9C8976FDF38Ac; // Base Sepolia Aave Data Provider
-    address constant A_USDC = 0x4c5Ae35B3F16faCAa5A41f4bA145d9aD887E8a5a; // Base Sepolia aUSDC
-    address constant ETH_USD_PRICE_FEED = 0x71041dddad094ae566b4d4cd0fa6c97e45b01e60; // Base Sepolia ETH/USD Price Feed
+    address constant A_USDC = 0x4C5aE35b3f16fAcaA5a41f4Ba145D9aD887e8a5a; // Base Sepolia aUSDC
+    address constant ETH_USD_PRICE_FEED = 0x71041DDDAd094AE566B4d4cd0FA6C97e45B01E60; // Base Sepolia ETH/USD Price Feed
     
     function run() external {
         // Get deployer private key from env

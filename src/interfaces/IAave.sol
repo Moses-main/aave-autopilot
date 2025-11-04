@@ -18,6 +18,16 @@ interface IPool {
      * @param to Address that will receive the assets
      */
     function withdraw(address asset, uint256 amount, address to) external returns (uint256);
+
+    /**
+     * @notice Repay borrowed assets to Aave
+     * @param asset The address of the borrowed underlying asset
+     * @param amount The amount to repay (use type(uint256).max for all)
+     * @param rateMode The interest rate mode of the debt being repaid (1 for stable, 2 for variable)
+     * @param onBehalfOf Address of the user who will get his debt reduced/removed
+     * @return The final amount repaid
+     */
+    function repay(address asset, uint256 amount, uint256 rateMode, address onBehalfOf) external returns (uint256);
 }
 
 interface IPoolDataProvider {

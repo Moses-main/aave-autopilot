@@ -57,7 +57,7 @@ forge script script/Deploy.s.sol:DeployScript \
   --broadcast \
   --verify \
   --verifier-url https://api-sepolia.basescan.org/api \
-  --etherscan-api-key $BASESCAN_API_KEY \
+  --etherscan-api-key $ETHERSCAN_API_KEY \
   -vvvv
 ```
 
@@ -91,7 +91,7 @@ forge script script/Deploy.s.sol:DeployScript \
 ## Common Issues & Solutions
 
 1. **Verification Fails**
-   - Ensure your `BASESCAN_API_KEY` is correct
+   - Ensure your `ETHERSCAN_API_KEY` is correct
    - Check that the contract was deployed successfully before verifying
    - Try adding `--force` to the verification command
 

@@ -3,8 +3,8 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/IAave.sol";
 import "./interfaces/AggregatorV3Interface.sol";
@@ -49,6 +49,10 @@ contract AaveAutopilot is ERC4626, Ownable, ReentrancyGuard, Pausable, KeeperCom
 
     event HealthFactorChecked(uint256 healthFactor, bool actionTaken);
     event PositionAdjusted(uint256 oldHealthFactor, uint256 newHealthFactor);
+    
+    // ERC4626 Events
+    event Deposited(address indexed sender, address indexed owner, uint256 assets, uint256 shares);
+    event Withdrawn(address indexed sender, address indexed receiver, address indexed owner, uint256 assets, uint256 shares);
 
     // ============ Constructor ============
 
@@ -97,7 +101,6 @@ contract AaveAutopilot is ERC4626, Ownable, ReentrancyGuard, Pausable, KeeperCom
     /**
      * @notice Deposit assets into the vault
      */
-    // Update _deposit function
     function _deposit(address caller, address receiver, uint256 assets, uint256 shares) 
         internal 
         override 
@@ -107,11 +110,16 @@ contract AaveAutopilot is ERC4626, Ownable, ReentrancyGuard, Pausable, KeeperCom
         require(assets > 0, "Cannot deposit 0");
         require(shares > 0, "Invalid share amount");
         
-        super._deposit(caller, receiver, assets, shares);
+        // First, transfer assets from the caller to this contract
+        SafeERC20.safeTransferFrom(IERC20(asset()), caller, address(this), assets);
         
-        // Supply to Aave
+        // Then supply to Aave
         aavePool.supply(asset(), assets, address(this), 0);
         
+        // Finally, mint shares to the receiver
+        _mint(receiver, shares);
+        
+        emit Deposit(caller, receiver, assets, shares);
         emit Deposited(caller, receiver, assets, shares);
     }
 
@@ -153,10 +161,7 @@ contract AaveAutopilot is ERC4626, Ownable, ReentrancyGuard, Pausable, KeeperCom
      * @return healthFactor The current health factor (scaled by 1e18)
      */
     function getCurrentHealthFactor() public view returns (uint256 healthFactor) {
-        (, , , , , healthFactor) = aaveDataProvider.getUserReserveData(
-            address(asset()),
-            address(this)
-        );
+        (, , , , , healthFactor) = aaveDataProvider.getUserAccountData(address(this));
         return healthFactor;
     }
     
@@ -231,8 +236,8 @@ contract AaveAutopilot is ERC4626, Ownable, ReentrancyGuard, Pausable, KeeperCom
     function _rebalancePosition(uint256 currentHf) internal {
         require(currentHf < MIN_HEALTH_FACTOR, "Health factor is safe");
         
-        // Get current debt and collateral
-        (uint256 totalDebtETH, uint256 availableBorrowsETH, , , , ) = aavePool.getUserAccountData(address(this));
+        // Get current debt and collateral from Aave
+        (uint256 totalCollateralETH, uint256 totalDebtETH, uint256 availableBorrowsETH, , , ) = aaveDataProvider.getUserAccountData(address(this));
         
         // Calculate how much to repay to reach target health factor
         uint256 ethPrice = getEthPrice();
