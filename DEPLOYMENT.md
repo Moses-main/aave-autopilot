@@ -13,7 +13,7 @@ This guide provides step-by-step instructions for deploying the AAVE Autopilot V
 
 2. **Repository Setup**
    ```bash
-   git clone https://github.com/your-username/aave-autopilot.git
+   git clone https://github.com/Moses-main/aave-autopilot.gi
    cd aave-autopilot
    forge install
    ```
