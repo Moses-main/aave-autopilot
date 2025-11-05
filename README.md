@@ -13,7 +13,7 @@ An ERC-4626 vault that automates Aave v3 position management with Chainlink Auto
 - **Chainlink Automation**: Uses Chainlink Keepers for automated rebalancing
 - **Gas Efficient**: Optimized for minimal gas usage
 - **Secure**: Implements OpenZeppelin's security patterns
-- **Fork Testing**: Supports local forked testing on Base Sepolia
+- **Fork Testing**: Supports local forked testing on Ethereum Sepolia
 
 ## Architecture
 
@@ -57,15 +57,16 @@ An ERC-4626 vault that automates Aave v3 position management with Chainlink Auto
    Create a `.env` file in the root directory with the following content:
    ```bash
    # Network RPC URLs
+   # RPC Configuration
    FORKED_URL=https://soft-distinguished-uranium.ethereum-sepolia.quiknode.pro/e28e07caa3efb8c50dc2a28854dd53578f91626c/
-   RPC_URL=https://eth-sepolia.g.alchemy.com/v2/Nlqb7FgqigV25XoAODWhD
+   RPC_URL=https://eth-sepolia.g.alchemy.com/v2/your-api-key
    
    # Deployment
    PRIVATE_KEY=your_private_key_here
-   ETHERSCAN_API_KEY=DEZFUW3ZGA5S9989B9PU1JGECZE9GT5AZ5
+   ETHERSCAN_API_KEY=your_etherscan_api_key
    
-   # Contract addresses (will be updated after deployment)
-   VAULT_ADDRESS=
+   # Contract addresses (Ethereum Sepolia)
+   VAULT_ADDRESS=0xaE2202566bE5325e2A5746b66E13F0D6f7E248b6
    ```
    
    ⚠️ **Important**: Never commit your `.env` file to version control. Add it to `.gitignore`.
@@ -99,9 +100,9 @@ forge coverage --report lcov && genhtml lcov.info --output-dir coverage
    forge script script/DeployForked.s.sol --rpc-url http://localhost:8545 --broadcast -vvvv --private-key $PRIVATE_KEY
    ```
 
-### Deployment to Sepolia Testnet
+### Deployment to Ethereum Sepolia Testnet
 
-1. Deploy to Sepolia:
+1. Deploy to Ethereum Sepolia:
    ```bash
    source .env
    forge script script/DeployForked.s.sol \
@@ -171,7 +172,7 @@ The AAVE Autopilot Vault provides a simple interface for users to deposit USDC, 
 - **Security First**: Implements reentrancy protection, pausable functionality, and access control
 - **ERC-4626 Standard**: Fully compliant with the ERC-4626 tokenized vault standard
 - **Comprehensive Testing**: Extensive test suite covering edge cases and security scenarios
-- **Base Network Ready**: Pre-configured for Base Sepolia testnet with easy mainnet deployment
+- **Ethereum Sepolia Ready**: Pre-configured for Ethereum Sepolia testnet with easy mainnet deployment
 
 ## 🚀 Project Status
 
@@ -186,7 +187,7 @@ The AAVE Autopilot Vault provides a simple interface for users to deposit USDC, 
 
 - [x] Core smart contract development
 - [x] Comprehensive test suite
-- [x] Base Sepolia deployment
+- [x] Ethereum Sepolia deployment
 - [ ] Security audit
 - [ ] Mainnet deployment
 - [ ] Frontend integration
@@ -307,26 +308,29 @@ forge script script/Deploy.s.sol:DeployScript \
 
 ## 🔍 Verification
 
-After deployment, verify the contract on Etherscan:
+The contract is already verified on Etherscan:
+- [AaveAutopilot on Etherscan](https://sepolia.etherscan.io/address/0xaE2202566bE5325e2A5746b66E13F0D6f7E248b6#code)
+
+To verify the contract manually, use:
 
 ```bash
 forge verify-contract \
-  --chain-id 84532 \
+  --chain-id 11155111 \
   --compiler-version v0.8.20+commit.a1b79de6 \
   --constructor-args $(cast abi-encode "constructor(address,string,string,address,address,address,address)" \
-    $USDC \
+    0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238 \
     "Aave Autopilot USDC" \
     "apUSDC" \
-    $AAVE_POOL \
-    $AAVE_DATA_PROVIDER \
-    $A_USDC \
-    $ETH_USD_PRICE_FEED
-  ) \
+    0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951 \
+    0x3e9708D80F7b3e431180130bF478987472f950aF \
+    0x16dA4541aD1807f4443d92D26044C1147406EB80 \
+    0x694AA1769357215DE4FAC081bf1f309aDC325306 \
+    0x03a33E8A69f1A5b61178f70BC5c8E674aB571334) \
   --num-of-optimizations 200 \
-  --watch \
-  $CONTRACT_ADDRESS \
-  src/AaveAutopilot.sol:AaveAutopilot \
-  $ETHERSCAN_API_KEY
+  AaveAutopilot \
+  0xaE2202566bE5325e2A5746b66E13F0D6f7E248b6 \
+  --verifier etherscan \
+  --etherscan-api-key $ETHERSCAN_API_KEY
 
 2. Deploy the contract:
 
