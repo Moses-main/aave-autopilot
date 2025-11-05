@@ -3,9 +3,11 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/IAave.sol";
 import "./interfaces/AggregatorV3Interface.sol";
 import "./interfaces/KeeperCompatibleInterface.sol";
@@ -15,7 +17,19 @@ import "./interfaces/KeeperCompatibleInterface.sol";
  * @notice ERC-4626 vault that manages Aave v3 positions with automatic health factor monitoring
  * @dev Implements intelligent position management to prevent liquidations
  */
-contract AaveAutopilot is ERC4626, Ownable, ReentrancyGuard, Pausable, KeeperCompatibleInterface {
+contract AaveAutopilot is 
+    ERC4626, 
+    Ownable, 
+    ReentrancyGuard, 
+    Pausable, 
+    AccessControl, 
+    KeeperCompatibleInterface 
+{
+    using SafeERC20 for IERC20;
+    
+    // Roles
+    bytes32 public constant KEEPER_ROLE = keccak256("KEEPER_ROLE");
+    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     // ============ State Variables ============
 
     /// @notice Minimum health factor before triggering auto-adjustment (1.05x)
@@ -39,8 +53,8 @@ contract AaveAutopilot is ERC4626, Ownable, ReentrancyGuard, Pausable, KeeperCom
     /// @notice Aave aToken for the underlying asset
     IAToken public immutable aToken;
     
-    /// @notice Last time the position was rebalanced
-    uint256 public lastRebalanceTimestamp;
+    /// @notice Track last rebalance timestamp per user
+    mapping(address => uint256) public lastRebalanceTimestamp;
     
     /// @notice Minimum time between rebalances (1 hour)
     uint256 public constant REBALANCE_COOLDOWN = 1 hours;
@@ -49,6 +63,16 @@ contract AaveAutopilot is ERC4626, Ownable, ReentrancyGuard, Pausable, KeeperCom
 
     event HealthFactorChecked(uint256 healthFactor, bool actionTaken);
     event PositionAdjusted(uint256 oldHealthFactor, uint256 newHealthFactor);
+    event PositionRebalanced(address indexed user, uint256 oldHealthFactor, uint256 newHealthFactor);
+    event KeeperTriggered(address indexed keeper, address indexed user, uint256 healthFactor);
+    event RebalanceAttempt(
+        address indexed user,
+        uint256 oldHealthFactor,
+        uint256 newHealthFactor,
+        bool success,
+        string reason
+    );
+    event MaxAttemptsReached(address indexed user);
     
     // ERC4626 Events
     event Deposited(address indexed sender, address indexed owner, uint256 assets, uint256 shares);
@@ -57,23 +81,30 @@ contract AaveAutopilot is ERC4626, Ownable, ReentrancyGuard, Pausable, KeeperCom
     // ============ Constructor ============
 
     /**
-     * @param asset The underlying asset (e.g., USDC)
-     * @param vaultName Name of the vault token
-     * @param vaultSymbol Symbol of the vault token
+     * @param _asset The underlying asset (e.g., USDC)
+     * @param _name Name of the vault token
+     * @param _symbol Symbol of the vault token
      * @param _aavePool The Aave v3 pool address
      * @param _aaveDataProvider The Aave v3 data provider address
      * @param _aToken The Aave v3 aToken address
      * @param _ethUsdPriceFeed Chainlink ETH/USD price feed address
+     * @param _owner Owner of the contract
      */
     constructor(
-        IERC20 asset,
-        string memory vaultName,
-        string memory vaultSymbol,
+        IERC20 _asset,
+        string memory _name,
+        string memory _symbol,
         address _aavePool,
         address _aaveDataProvider,
         address _aToken,
-        address _ethUsdPriceFeed
-    ) ERC4626(asset) ERC20(vaultName, vaultSymbol) Ownable(msg.sender) {
+        address _ethUsdPriceFeed,
+        address _owner
+    ) ERC4626(_asset) ERC20(_name, _symbol) Ownable(_owner) {
+        // Set up roles
+        _grantRole(DEFAULT_ADMIN_ROLE, _owner);
+        _grantRole(PAUSER_ROLE, _owner);
+        _grantRole(KEEPER_ROLE, _owner);
+        
         require(_aavePool != address(0), "Invalid Aave Pool");
         require(_aaveDataProvider != address(0), "Invalid Data Provider");
         require(_aToken != address(0), "Invalid aToken");
@@ -85,7 +116,10 @@ contract AaveAutopilot is ERC4626, Ownable, ReentrancyGuard, Pausable, KeeperCom
         ethUsdPriceFeed = AggregatorV3Interface(_ethUsdPriceFeed);
         
         // Approve Aave Pool to spend our tokens
-        IERC20(asset).approve(_aavePool, type(uint256).max);
+        IERC20(asset()).safeIncreaseAllowance(_aavePool, type(uint256).max);
+        
+        // Transfer ownership to the specified owner
+        _transferOwnership(_owner);
     }
 
     // ============ Core ERC-4626 Functions ============
@@ -154,6 +188,105 @@ contract AaveAutopilot is ERC4626, Ownable, ReentrancyGuard, Pausable, KeeperCom
         emit Withdrawn(caller, receiver, owner, assets, shares);
     }
 
+            // ============ Chainlink Automation ============
+    
+    // Constants for batch processing and circuit breaker
+    uint256 public currentBatchIndex;
+    uint256 public constant MAX_REBALANCE_ATTEMPTS = 3;
+    
+    // Track rebalance attempts per user
+    mapping(address => uint256) public rebalanceAttempts;
+    
+    /**
+     * @notice Method called by Chainlink Keepers to check if upkeep is needed
+     * @dev Processes users in batches to avoid gas limits
+     */
+    function checkUpkeep(
+        bytes calldata checkData
+    ) external view override returns (bool upkeepNeeded, bytes memory performData) {
+        // If specific user is provided in checkData, check only that user
+        if (checkData.length > 0) {
+            address user = abi.decode(checkData, (address));
+            uint256 userHf = getHealthFactor(user);
+            uint256 userLastRebalance = lastRebalanceTimestamp[user];
+            bool userTimePassed = block.timestamp - userLastRebalance >= REBALANCE_COOLDOWN;
+            bool userNeedsRebalance = userHf < KEEPER_THRESHOLD && 
+                                    userHf > 0 && 
+                                    rebalanceAttempts[user] < MAX_REBALANCE_ATTEMPTS &&
+                                    userTimePassed;
+            
+            if (userNeedsRebalance) {
+                address[] memory usersToRebalance = new address[](1);
+                usersToRebalance[0] = user;
+                return (true, abi.encode(usersToRebalance));
+            }
+        }
+        
+        // In production, implement batch processing of users
+        // For demo, we'll use a simplified approach with currentBatchIndex
+        address[] memory usersToCheck = new address[](1);
+        address currentUser = msg.sender; // Replace with actual batch processing
+        usersToCheck[0] = currentUser;
+        
+        uint256 currentHf = getHealthFactor(currentUser);
+        uint256 currentUserLastRebalance = lastRebalanceTimestamp[currentUser];
+        bool currentTimePassed = block.timestamp - currentUserLastRebalance >= REBALANCE_COOLDOWN;
+        bool currentNeedsRebalance = currentHf < KEEPER_THRESHOLD && 
+                                   currentHf > 0 && 
+                                   rebalanceAttempts[currentUser] < MAX_REBALANCE_ATTEMPTS &&
+                                   currentTimePassed;
+        
+        return (currentNeedsRebalance, abi.encode(usersToCheck));
+    }
+    
+    /**
+     * @notice Method called by Chainlink Keepers to perform upkeep
+     * @dev Will only be called if checkUpkeep returns true
+     */
+    function performUpkeep(
+        bytes calldata performData
+    ) external override onlyRole(KEEPER_ROLE) whenNotPaused {
+        address[] memory users = abi.decode(performData, (address[]));
+        
+        for (uint256 i = 0; i < users.length; i++) {
+            address user = users[i];
+            uint256 oldHealthFactor = getHealthFactor(user);
+            
+            // Skip if user doesn't need rebalancing or has exceeded max attempts
+            if (oldHealthFactor >= KEEPER_THRESHOLD || 
+                oldHealthFactor == 0 || 
+                rebalanceAttempts[user] >= MAX_REBALANCE_ATTEMPTS) {
+                continue;
+            }
+            
+            try this._rebalancePosition(user) {
+                // Success - reset attempt counter
+                rebalanceAttempts[user] = 0;
+                emit PositionRebalanced(user, oldHealthFactor, getHealthFactor(user));
+                emit RebalanceAttempt(user, oldHealthFactor, getHealthFactor(user), true, "");
+            } catch Error(string memory reason) {
+                // Increment attempt counter on failure
+                rebalanceAttempts[user]++;
+                emit RebalanceAttempt(user, oldHealthFactor, 0, false, reason);
+                
+                if (rebalanceAttempts[user] >= MAX_REBALANCE_ATTEMPTS) {
+                    emit MaxAttemptsReached(user);
+                }
+            } catch (bytes memory) {
+                // Catch any other errors
+                rebalanceAttempts[user]++;
+                emit RebalanceAttempt(user, oldHealthFactor, 0, false, "Unknown error");
+                
+                if (rebalanceAttempts[user] >= MAX_REBALANCE_ATTEMPTS) {
+                    emit MaxAttemptsReached(user);
+                }
+            }
+        }
+        
+        // Update batch index for next run
+        currentBatchIndex = (currentBatchIndex + 1) % 10;
+    }
+    
     // ============ Health Factor Management ============
     
     /**
@@ -162,6 +295,27 @@ contract AaveAutopilot is ERC4626, Ownable, ReentrancyGuard, Pausable, KeeperCom
      */
     function getCurrentHealthFactor() public view returns (uint256 healthFactor) {
         (, , , , , healthFactor) = aaveDataProvider.getUserAccountData(address(this));
+        return healthFactor;
+    }
+    
+    /**
+     * @notice Get the current health factor for a user
+     * @param user The address of the user
+     * @return healthFactor The current health factor (scaled by 1e18)
+     */
+    function getHealthFactor(address user) public view returns (uint256) {
+        if (user == address(0)) return 0;
+        
+        // Get user account data from Aave
+        (
+            uint256 totalCollateralETH,
+            uint256 totalDebtETH,
+            uint256 availableBorrowsETH,
+            uint256 currentLiquidationThreshold,
+            uint256 ltv,
+            uint256 healthFactor
+        ) = aaveDataProvider.getUserAccountData(user);
+        
         return healthFactor;
     }
     
@@ -181,60 +335,6 @@ contract AaveAutopilot is ERC4626, Ownable, ReentrancyGuard, Pausable, KeeperCom
         return uint256(price);
     }
     
-    /**
-     * @notice Check if the position needs rebalancing
-     * @return upkeepNeeded Whether upkeep is needed
-     * @return performData Encoded data for the performUpkeep call
-     */
-    /**
-     * @notice Check if the position needs rebalancing
-     * @return upkeepNeeded Whether upkeep is needed
-     * @return performData Encoded data for the performUpkeep call
-     */
-    function checkUpkeep(
-        bytes calldata /* checkData */
-    ) 
-        external 
-        view 
-        override 
-        returns (bool upkeepNeeded, bytes memory performData) 
-    {
-        uint256 healthFactor = getCurrentHealthFactor();
-        bool timePassed = block.timestamp - lastRebalanceTimestamp >= REBALANCE_COOLDOWN;
-        
-        upkeepNeeded = (healthFactor < KEEPER_THRESHOLD) && timePassed;
-        performData = abi.encode(healthFactor);
-        
-        return (upkeepNeeded, performData);
-    }
-    
-    /**
-     * @notice Perform the rebalancing if needed
-     * @param performData Encoded data from checkUpkeep
-     */
-    /**
-     * @notice Perform the rebalancing if needed
-     * @param performData Encoded data from checkUpkeep
-     */
-    function performUpkeep(
-        bytes calldata performData
-    ) 
-        external 
-        override 
-        whenNotPaused
-    {
-        (uint256 healthFactor) = abi.decode(performData, (uint256));
-        require(healthFactor < KEEPER_THRESHOLD, "Health factor above threshold");
-        require(
-            block.timestamp - lastRebalanceTimestamp >= REBALANCE_COOLDOWN, 
-            "Cooldown not met"
-        );
-        
-        lastRebalanceTimestamp = block.timestamp;
-        _rebalancePosition(healthFactor);
-        
-        emit PositionAdjusted(healthFactor, getCurrentHealthFactor());
-    }
     
     /**
      * @notice Check and adjust the position's health factor
@@ -242,19 +342,23 @@ contract AaveAutopilot is ERC4626, Ownable, ReentrancyGuard, Pausable, KeeperCom
     function checkAndAdjustPosition() external whenNotPaused {
         uint256 healthFactor = getCurrentHealthFactor();
         if (healthFactor < MIN_HEALTH_FACTOR) {
-            _rebalancePosition(healthFactor);
+            this._rebalancePosition(msg.sender);
         }
     }
     
     /**
      * @notice Internal function to rebalance the position
-     * @param currentHf Current health factor
+     * @param user Address of the user whose position needs rebalancing
      */
-    function _rebalancePosition(uint256 currentHf) internal {
+    function _rebalancePosition(address user) external {
+        // This function is called via try/catch, so we use a reentrancy guard
+        require(msg.sender == address(this), "Only callable internally");
+        
+        uint256 currentHf = getHealthFactor(user);
         require(currentHf < MIN_HEALTH_FACTOR, "Health factor is safe");
         
         // Get current debt and collateral from Aave
-        (uint256 totalCollateralETH, uint256 totalDebtETH, uint256 availableBorrowsETH, , , ) = aaveDataProvider.getUserAccountData(address(this));
+        (uint256 totalCollateralETH, uint256 totalDebtETH, , , , ) = aaveDataProvider.getUserAccountData(address(this));
         
         // Calculate how much to repay to reach target health factor
         uint256 ethPrice = getEthPrice();
@@ -262,38 +366,69 @@ contract AaveAutopilot is ERC4626, Ownable, ReentrancyGuard, Pausable, KeeperCom
         uint256 repayAmountETH = totalDebtETH - targetDebt;
         
         if (repayAmountETH > 0) {
-            // Convert ETH amount to asset amount
-            uint256 repayAmount = (repayAmountETH * 1e8) / ethPrice; // Convert to asset decimals
+            // Convert ETH amount to asset amount (adjust decimals as needed)
+            uint256 repayAmount = (repayAmountETH * 1e8) / ethPrice;
             
             // Check if we have enough liquidity to repay
             uint256 availableLiquidity = IERC20(asset()).balanceOf(address(this));
+            
             if (repayAmount > availableLiquidity) {
-                // Withdraw some from Aave if needed
+                // Calculate how much we can safely withdraw
+                uint256 maxWithdraw = totalCollateralETH - (totalDebtETH * 1e18) / MIN_HEALTH_FACTOR;
                 uint256 needed = repayAmount - availableLiquidity;
-                aavePool.withdraw(asset(), needed, address(this));
+                uint256 withdrawAmount = needed > maxWithdraw ? maxWithdraw : needed;
+                
+                if (withdrawAmount > 0) {
+                    // Withdraw from Aave
+                    aavePool.withdraw(asset(), withdrawAmount, address(this));
+                }
+                
+                // Update available liquidity after withdrawal
+                availableLiquidity = IERC20(asset()).balanceOf(address(this));
             }
             
-            // Repay debt
-            aavePool.repay(asset(), repayAmount, 2, address(this));
+            // Repay debt with available liquidity (don't try to repay more than we have)
+            uint256 actualRepayAmount = repayAmount > availableLiquidity ? availableLiquidity : repayAmount;
+            if (actualRepayAmount > 0) {
+                aavePool.repay(asset(), actualRepayAmount, 2, address(this));
+            }
         }
         
         emit PositionAdjusted(currentHf, getCurrentHealthFactor());
     }
     
     // ============ Admin Functions ============
-    
+
     /**
-     * @notice Pause the contract in case of emergency
+     * @notice Pause all state-changing operations
+     * @dev Only callable by accounts with PAUSER_ROLE
      */
-    function pause() external onlyOwner {
+    function pause() external onlyRole(PAUSER_ROLE) {
         _pause();
+    }
+
+    /**
+     * @notice Unpause all state-changing operations
+     * @dev Only callable by accounts with PAUSER_ROLE
+     */
+    function unpause() external onlyRole(PAUSER_ROLE) {
+        _unpause();
     }
     
     /**
-     * @notice Unpause the contract
+     * @notice Grant Keeper role to an address
+     * @param keeper Address to grant Keeper role to
      */
-    function unpause() external onlyOwner {
-        _unpause();
+    function addKeeper(address keeper) external onlyOwner {
+        grantRole(KEEPER_ROLE, keeper);
+    }
+    
+    /**
+     * @notice Revoke Keeper role from an address
+     * @param keeper Address to revoke Keeper role from
+     */
+    function removeKeeper(address keeper) external onlyOwner {
+        revokeRole(KEEPER_ROLE, keeper);
     }
     
     /**

@@ -43,17 +43,17 @@ contract SimpleInteract is Test {
         
         // Check contract addresses
         address asset = autopilot.asset();
-        address aavePool = autopilot.aavePool();
-        address aaveDataProvider = autopilot.aaveDataProvider();
+        IPool aavePool = autopilot.aavePool();
+        IPoolDataProvider aaveDataProvider = autopilot.aaveDataProvider();
         
         console.log("Asset:", asset);
-        console.log("Aave Pool:", aavePool);
-        console.log("Aave Data Provider:", aaveDataProvider);
+        console.log("Aave Pool:", address(aavePool));
+        console.log("Aave Data Provider:", address(aaveDataProvider));
         
         // Basic assertions
         assertEq(asset, USDC, "USDC address mismatch");
-        assertEq(aavePool, AAVE_POOL, "Aave Pool address mismatch");
-        assertEq(aaveDataProvider, AAVE_DATA_PROVIDER, "Aave Data Provider address mismatch");
+        assertEq(address(aavePool), AAVE_POOL, "Aave Pool address mismatch");
+        assertEq(address(aaveDataProvider), AAVE_DATA_PROVIDER, "Aave Data Provider address mismatch");
     }
     
     function testCheckUpkeep() public {

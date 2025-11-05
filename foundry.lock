@@ -5,6 +5,12 @@
       "rev": "b74526a7bc67a3a117a1963fc871b3eb8cea8435"
     }
   },
+  "lib/chainlink": {
+    "tag": {
+      "name": "v0.8.1",
+      "rev": "8054cf761b4d3625b81184080b1e6396c0e0de05"
+    }
+  },
   "lib/forge-std": {
     "tag": {
       "name": "v1.11.0",
@@ -15,6 +21,12 @@
     "tag": {
       "name": "v5.5.0",
       "rev": "fcbae5394ae8ad52d8e580a3477db99814b9d565"
+    }
+  },
+  "lib/openzeppelin-contracts-upgradeable": {
+    "tag": {
+      "name": "v4.9.3",
+      "rev": "3d4c0d5741b131c231e558d7a6213392ab3672a5"
     }
   }
 }

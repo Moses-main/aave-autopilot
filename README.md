@@ -5,7 +5,158 @@
 [![Test Status](https://github.com/Moses-main/aave-autopilot/actions/workflows/test.yml/badge.svg)](https://github.com/Moses-main/aave-autopilot/actions)
 [![Coverage Status](https://coveralls.io/repos/github/Moses-main/aave-autopilot/badge.svg?branch=main)](https://coveralls.io/github/Moses-main/aave-autopilot?branch=main)
 
-An ERC-4626 compliant vault that automates AAVE v3 positions with health factor monitoring and automatic rebalancing on Base network. The vault is designed to maximize capital efficiency while minimizing liquidation risk through automated position management.
+An ERC-4626 vault that automates Aave v3 position management with Chainlink Automation to prevent liquidations.
+
+## Features
+
+- **Automated Health Factor Management**: Monitors and maintains healthy positions on Aave v3
+- **Chainlink Automation**: Uses Chainlink Keepers for automated rebalancing
+- **Gas Efficient**: Optimized for minimal gas usage
+- **Secure**: Implements OpenZeppelin's security patterns
+- **Fork Testing**: Supports local forked testing on Base Sepolia
+
+## Architecture
+
+```
+┌─────────────┐    ┌───────────────────┐    ┌─────────────┐
+│             │    │                   │    │             │
+│   User      │───▶│  AaveAutopilot    │◀──▶│  Aave V3    │
+│             │    │  (ERC-4626 Vault) │    │  Protocol   │
+└─────────────┘    └────────┬──────────┘    └─────────────┘
+                            │
+                            │  Monitors
+                            ▼
+                   ┌───────────────────┐
+                   │  Chainlink       │
+                   │  Automation      │
+                   └───────────────────┘
+```
+
+## Setup
+
+### Prerequisites
+
+- [Foundry](https://book.getfoundry.sh/getting-started/installation)
+- [Node.js](https://nodejs.org/) (for additional tooling)
+- [Git](https://git-scm.com/)
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/your-username/aave-autopilot.git
+   cd aave-autopilot
+   ```
+
+2. Install dependencies:
+   ```bash
+   forge install
+   ```
+
+3. Set up environment variables:
+   Create a `.env` file in the root directory with the following content:
+   ```bash
+   # Network RPC URLs
+   FORKED_URL=https://soft-distinguished-uranium.ethereum-sepolia.quiknode.pro/e28e07caa3efb8c50dc2a28854dd53578f91626c/
+   RPC_URL=https://eth-sepolia.g.alchemy.com/v2/Nlqb7FgqigV25XoAODWhD
+   
+   # Deployment
+   PRIVATE_KEY=your_private_key_here
+   ETHERSCAN_API_KEY=DEZFUW3ZGA5S9989B9PU1JGECZE9GT5AZ5
+   
+   # Contract addresses (will be updated after deployment)
+   VAULT_ADDRESS=
+   ```
+   
+   ⚠️ **Important**: Never commit your `.env` file to version control. Add it to `.gitignore`.
+
+## Testing
+
+### Run Tests
+
+```bash
+forge test -vv
+```
+
+### Run Tests with Coverage
+
+```bash
+forge coverage --report lcov && genhtml lcov.info --output-dir coverage
+```
+
+## Deployment
+
+### Local Fork Testing
+
+1. Start a local Anvil node forked from Sepolia:
+   ```bash
+   anvil --fork-url $FORKED_URL
+   ```
+
+2. In a new terminal, deploy to the forked network:
+   ```bash
+   source .env
+   forge script script/DeployForked.s.sol --rpc-url http://localhost:8545 --broadcast -vvvv --private-key $PRIVATE_KEY
+   ```
+
+### Deployment to Sepolia Testnet
+
+1. Deploy to Sepolia:
+   ```bash
+   source .env
+   forge script script/DeployForked.s.sol \
+     --rpc-url $RPC_URL \
+     --broadcast \
+     --verify \
+     -vvvv \
+     --private-key $PRIVATE_KEY \
+     --etherscan-api-key $ETHERSCAN_API_KEY
+   ```
+
+2. After deployment, update your `.env` with the deployed contract address:
+   ```bash
+   echo "VAULT_ADDRESS=0xDeployedContractAddress" >> .env
+   ```
+
+## Chainlink Automation Setup
+
+After deployment, register your contract with Chainlink Automation:
+
+1. Fund your contract with LINK tokens for payment
+2. Register the contract with the Chainlink Automation Registry
+3. Set up the appropriate trigger conditions (health factor threshold)
+
+Example registration parameters:
+- Name: AaveAutopilot Keeper
+- Gas Limit: 500,000
+- Trigger Type: Custom Logic
+- Check Data: Encoded user address (or empty for all users)
+- Gas Lane: 500 gwei
+- Amount: 5 LINK
+
+## Security
+
+### Audits
+
+This code has not been audited. Use at your own risk.
+
+### Security Features
+
+- Reentrancy protection with OpenZeppelin's ReentrancyGuard
+- Role-based access control
+- Pausable functionality for emergency stops
+- Input validation
+- Secure token handling with OpenZeppelin's SafeERC20
+
+### Known Limitations
+
+- The keeper may not be able to rebalance if gas prices are extremely high
+- The contract doesn't handle all edge cases of Aave v3's complex liquidation mechanics
+- The keeper may need to be topped up with ETH for gas costs
+
+## License
+
+MIT
 
 ## 📖 Overview
 

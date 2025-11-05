@@ -41,7 +41,8 @@ contract DeployScript is Script {
             AAVE_POOL, // Aave Pool
             AAVE_DATA_PROVIDER, // Aave Data Provider
             A_USDC, // aUSDC token
-            ETH_USD_PRICE_FEED // ETH/USD price feed
+            ETH_USD_PRICE_FEED, // ETH/USD price feed
+            msg.sender // Owner
         );
         
         // Log deployment details

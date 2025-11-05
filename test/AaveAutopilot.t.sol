@@ -115,10 +115,10 @@ contract AaveAutopilotTest is Test {
     MockAggregatorV3 public ethUsdPriceFeed;
     
     // Test addresses
-    address public alice = address(0x1);
-    address public bob = address(0x2);
-    address public keeper = address(0x3);
-    address public owner = address(this); // Test contract is the owner
+    address public owner;
+    address public alice;
+    address public bob;
+    address public keeper;
     
     // Aave mock addresses
     address public AAVE_POOL;
@@ -131,44 +131,67 @@ contract AaveAutopilotTest is Test {
     uint256 public constant INITIAL_BALANCE = 10_000 * 10 ** USDC_DECIMALS;
     
     function setUp() public {
-        // Deploy mock USDC
-        usdc = new MockERC20();
+        // Set up test accounts
+        owner = address(this);
+        alice = address(0x1);
+        bob = address(0x2);
+        keeper = address(0x3);
         
-        // Deploy mock Chainlink price feed
-        ethUsdPriceFeed = new MockAggregatorV3(int256(INITIAL_ETH_PRICE));
+        // Deploy mock contracts
+        usdc = new MockERC20();
+        ethUsdPriceFeed = new MockAggregatorV3(2000e8); // $2000/ETH
         
         // Deploy mock Aave contracts
-        AAVE_POOL = address(new MockAavePool());
-        AAVE_DATA_PROVIDER = address(new MockAaveDataProvider());
-        A_TOKEN = address(new MockAToken(address(usdc)));
+        MockAavePool mockAavePool = new MockAavePool();
+        MockAaveDataProvider mockAaveDataProvider = new MockAaveDataProvider();
+        MockAToken mockAToken = new MockAToken(address(usdc));
         
-        // Deploy vault with mock dependencies
+        // Deploy the vault
         vault = new AaveAutopilot(
-            IERC20(address(usdc)),
-            "Aave Autopilot USDC",
-            "apUSDC",
-            AAVE_POOL,
-            AAVE_DATA_PROVIDER,
-            A_TOKEN,
-            address(ethUsdPriceFeed)
+            usdc,
+            "Aave Autopilot Vault",
+            "aAV",
+            address(mockAavePool),
+            address(mockAaveDataProvider),
+            address(mockAToken),
+            address(ethUsdPriceFeed),
+            keeper
         );
-
-        // Mint initial USDC to test accounts and vault
-        usdc.mint(alice, INITIAL_BALANCE);
-        usdc.mint(bob, INITIAL_BALANCE);
-        usdc.mint(address(this), INITIAL_BALANCE * 10);
         
-        // Approve vault to spend test contract's USDC
+        // Set up initial balances
+        usdc.mint(owner, 10000e6);
+        usdc.mint(alice, 5000e6);
+        usdc.mint(bob, 3000e6);
+        
+        // Approve vault to spend USDC
         usdc.approve(address(vault), type(uint256).max);
+        vm.prank(alice);
+        usdc.approve(address(vault), type(uint256).max);
+        vm.prank(bob);
+        usdc.approve(address(vault), type(uint256).max);
+        
+        // Set up mock data
+        mockAaveDataProvider.setUserReserveData(
+            address(usdc),
+            address(vault),
+            0,  // currentATokenBalance
+            0,  // currentStableDebt
+            0,  // currentVariableDebt
+            1e18, // liquidityRate
+            0,  // stableRate
+            0,  // principalStableDebt
+            0,  // scaledVariableDebt
+            address(0)  // stableDebtTokenAddress
+        );
         
         // Label addresses for better test traces
         vm.label(alice, "Alice");
         vm.label(bob, "Bob");
         vm.label(keeper, "Keeper");
         vm.label(address(usdc), "USDC");
-        vm.label(AAVE_POOL, "AavePool");
-        vm.label(AAVE_DATA_PROVIDER, "AaveDataProvider");
-        vm.label(A_TOKEN, "aUSDC");
+        vm.label(address(mockAavePool), "AavePool");
+        vm.label(address(mockAaveDataProvider), "AaveDataProvider");
+        vm.label(address(mockAToken), "aUSDC");
         vm.label(address(ethUsdPriceFeed), "ETH/USD Price Feed");
     }
     
@@ -186,6 +209,76 @@ contract AaveAutopilotTest is Test {
     }
     
     // Test deposit functionality
+    function testKeeperFunctions() public {
+        // Test adding and removing keeper
+        address newKeeper = address(0x123);
+        
+        // Only owner can add keeper
+        vm.prank(alice);
+        vm.expectRevert();
+        vault.addKeeper(newKeeper);
+        
+        // Owner can add keeper
+        vault.addKeeper(newKeeper);
+        assertTrue(vault.hasRole(vault.KEEPER_ROLE(), newKeeper));
+        
+        // Only owner can remove keeper
+        vm.prank(alice);
+        vm.expectRevert();
+        vault.removeKeeper(newKeeper);
+        
+        // Owner can remove keeper
+        vault.removeKeeper(newKeeper);
+        assertFalse(vault.hasRole(vault.KEEPER_ROLE(), newKeeper));
+    }
+    
+    function testCheckUpkeep() public {
+        // Deposit first to have a position
+        uint256 amount = 1000e6;
+        usdc.mint(alice, amount);
+        vm.prank(alice);
+        vault.deposit(amount, alice);
+        
+        // Set health factor to be below threshold
+        mockAaveData(1.04e18); // Below KEEPER_THRESHOLD (1.1e18)
+        
+        // Check upkeep with specific user
+        (bool upkeepNeeded, bytes memory performData) = vault.checkUpkeep(abi.encode(alice));
+        assertTrue(upkeepNeeded);
+        
+        // Check perform data
+        address[] memory users = abi.decode(performData, (address[]));
+        assertEq(users[0], alice);
+        
+        // Check with healthy position
+        mockAaveData(1.2e18); // Above KEEPER_THRESHOLD
+        (upkeepNeeded, ) = vault.checkUpkeep(abi.encode(alice));
+        assertFalse(upkeepNeeded);
+    }
+    
+    function testPerformUpkeep() public {
+        // Deposit first to have a position
+        uint256 amount = 1000e6;
+        usdc.mint(alice, amount);
+        vm.prank(alice);
+        vault.deposit(amount, alice);
+        
+        // Set health factor to be below threshold
+        mockAaveData(1.04e18); // Below KEEPER_THRESHOLD (1.1e18)
+        
+        // Only keeper can call performUpkeep
+        vm.prank(alice);
+        vm.expectRevert();
+        vault.performUpkeep(abi.encode(alice));
+        
+        // Keeper can call performUpkeep
+        vm.prank(keeper);
+        vault.performUpkeep(abi.encode(alice));
+        
+        // Should have rebalanced the position
+        // In a real test, we would verify the rebalancing logic here
+    }
+    
     function testDeposit() public {
         uint256 amount = 1000 * 10 ** USDC_DECIMALS;
         
@@ -576,6 +669,27 @@ contract AaveAutopilotTest is Test {
     }
     
     // Test pausing functionality
+    function testPausePermissions() public {
+        // Test that only PAUSER_ROLE can pause
+        vm.prank(alice);
+        vm.expectRevert();
+        vault.pause();
+        
+        // Grant PAUSER_ROLE to alice
+        vm.prank(owner);
+        vault.grantRole(vault.PAUSER_ROLE(), alice);
+        
+        // Now alice can pause
+        vm.prank(alice);
+        vault.pause();
+        assertTrue(vault.paused());
+        
+        // Test unpause
+        vm.prank(alice);
+        vault.unpause();
+        assertFalse(vault.paused());
+    }
+    
     function testPause() public {
         uint256 amount = 100e6; // 100 USDC
 
@@ -837,23 +951,75 @@ contract AaveAutopilotTest is Test {
 
 // Mock Aave Pool
 contract MockAavePool {
+    event Supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode);
+    event Withdraw(address asset, uint256 amount, address to);
+    event Borrow(address asset, uint256 amount, uint256 interestRateMode, uint16 referralCode, address onBehalfOf);
+    event Repay(address asset, uint256 amount, uint256 rateMode, address onBehalfOf);
+    
+    mapping(address => uint256) public supplyBalances;
+    mapping(address => uint256) public borrowBalances;
+    
     function supply(address asset, uint256 amount, address onBehalfOf, uint16) external {
-        // In a real test, we would update the user's aToken balance here
         IERC20(asset).transferFrom(msg.sender, address(this), amount);
+        supplyBalances[onBehalfOf] += amount;
+        emit Supply(asset, amount, onBehalfOf, 0);
     }
     
     function withdraw(address asset, uint256 amount, address to) external returns (uint256) {
-        // In a real test, we would check the user's aToken balance here
+        require(supplyBalances[msg.sender] >= amount, "Insufficient balance");
+        supplyBalances[msg.sender] -= amount;
         IERC20(asset).transfer(to, amount);
+        emit Withdraw(asset, amount, to);
         return amount;
     }
     
-    function repay(address asset, uint256 amount, uint256, address) external returns (uint256) {
+    function borrow(address asset, uint256 amount, uint256 interestRateMode, uint16, address onBehalfOf) external {
+        // In a real implementation, this would check collateral and health factor
+        borrowBalances[onBehalfOf] += amount;
+        IERC20(asset).transfer(onBehalfOf, amount);
+        emit Borrow(asset, amount, interestRateMode, 0, onBehalfOf);
+    }
+    
+    function repay(address asset, uint256 amount, uint256 rateMode, address onBehalfOf) external returns (uint256) {
+        if (amount == type(uint256).max) {
+            amount = borrowBalances[onBehalfOf];
+        }
+        require(borrowBalances[onBehalfOf] >= amount, "Repay amount exceeds debt");
+        
         IERC20(asset).transferFrom(msg.sender, address(this), amount);
+        borrowBalances[onBehalfOf] -= amount;
+        
+        emit Repay(asset, amount, rateMode, onBehalfOf);
         return amount;
     }
     
-    function getUserAccountData(address) external pure returns (uint256, uint256, uint256, uint256, uint256, uint256) {
+    // Implement other required interface functions with empty implementations
+    function setUserUseReserveAsCollateral(address, bool) external {}
+    function swapBorrowRateMode(address, uint256) external {}
+    function rebalanceStableBorrowRate(address, address) external {}
+    function setUserEMode(uint8) external {}
+    function flashLoan(
+        address,
+        address[] calldata,
+        uint256[] calldata,
+        uint256[] calldata,
+        address,
+        bytes calldata,
+        uint16
+    ) external {}
+    
+    function getUserAccountData(address)
+        external
+        pure
+        returns (
+            uint256,
+            uint256,
+            uint256,
+            uint256,
+            uint256,
+            uint256
+        )
+    {
         // Return mock data
         return (1e18, 0.5e18, 1e18, 8000, 7500, 2e18);
     }
@@ -861,14 +1027,135 @@ contract MockAavePool {
 
 // Mock Aave Data Provider
 contract MockAaveDataProvider {
-    function getUserAccountData(address) external pure returns (uint256, uint256, uint256, uint256, uint256, uint256) {
+    struct UserReserveData {
+        uint256 currentATokenBalance;
+        uint256 currentStableDebt;
+        uint256 currentVariableDebt;
+        uint256 liquidityRate;
+        uint256 stableBorrowRate;
+        uint256 principalStableDebt;
+        uint256 scaledVariableDebt;
+        address stableDebtTokenAddress;
+    }
+    
+    mapping(address => mapping(address => UserReserveData)) public userReserveData;
+    uint256 public healthFactor = 1.5e18; // Default to healthy position
+    
+    function setUserReserveData(
+        address asset,
+        address user,
+        uint256 currentATokenBalance,
+        uint256 currentStableDebt,
+        uint256 currentVariableDebt,
+        uint256 liquidityRate,
+        uint256 stableBorrowRate,
+        uint256 principalStableDebt,
+        uint256 scaledVariableDebt,
+        address stableDebtTokenAddress
+    ) public {
+        UserReserveData storage data = userReserveData[asset][user];
+        data.currentATokenBalance = currentATokenBalance;
+        data.currentStableDebt = currentStableDebt;
+        data.currentVariableDebt = currentVariableDebt;
+        data.liquidityRate = liquidityRate;
+        data.stableBorrowRate = stableBorrowRate;
+        data.principalStableDebt = principalStableDebt;
+        data.scaledVariableDebt = scaledVariableDebt;
+        data.stableDebtTokenAddress = stableDebtTokenAddress;
+    }
+    
+    function setHealthFactor(uint256 _healthFactor) public {
+        healthFactor = _healthFactor;
+    }
+    
+    function getUserReserveData(address asset, address user)
+        external
+        view
+        returns (
+            uint256 currentATokenBalance,
+            uint256 currentStableDebt,
+            uint256 currentVariableDebt,
+            uint256 principalStableDebt,
+            uint256 scaledVariableDebt,
+            uint256 stableBorrowRate,
+            uint256 liquidityRate,
+            uint40 stableRateLastUpdated,
+            bool usageAsCollateralEnabled
+        )
+    {
+        UserReserveData storage data = userReserveData[asset][user];
+        return (
+            data.currentATokenBalance,
+            data.currentStableDebt,
+            data.currentVariableDebt,
+            data.principalStableDebt,
+            data.scaledVariableDebt,
+            data.stableBorrowRate,
+            data.liquidityRate,
+            0, // stableRateLastUpdated
+            true // usageAsCollateralEnabled
+        );
+    }
+    
+    function getReserveConfigurationData(address asset)
+        external
+        pure
+        returns (
+            uint256 decimals,
+            uint256 ltv,
+            uint256 liquidationThreshold,
+            uint256 liquidationBonus,
+            uint256 reserveFactor,
+            bool usageAsCollateralEnabled,
+            bool borrowingEnabled,
+            bool stableBorrowRateEnabled,
+            bool isActive,
+            bool isFrozen
+        )
+    {
+        return (6, 7500, 8000, 10500, 1000, true, true, true, true, false);
+    }
+    
+    function getReserveData(address asset)
+        external
+        view
+        returns (
+            uint256 unbacked,
+            uint256 accruedToTreasuryScaled,
+            uint256 totalAToken,
+            uint256 totalStableDebt,
+            uint256 totalVariableDebt,
+            uint256 liquidityRate,
+            uint256 variableBorrowRate,
+            uint256 stableBorrowRate,
+            uint256 averageStableBorrowRate,
+            uint256 liquidityIndex,
+            uint256 variableBorrowIndex,
+            uint40 lastUpdateTimestamp
+        )
+    {
+        return (0, 0, 1000000e6, 0, 0, 0, 0, 0, 0, 1e27, 1e27, uint40(block.timestamp));
+    }
+    
+    function getUserAccountData(address user)
+        external
+        view
+        returns (
+            uint256 totalCollateralBase,
+            uint256 totalDebtBase,
+            uint256 availableBorrowsBase,
+            uint256 currentLiquidationThreshold,
+            uint256 ltv,
+            uint256 healthFactor_
+        )
+    {
         // Return mock data
-        return (1e18, 0.5e18, 1e18, 8000, 7500, 2e18);
+        return (1e18, 0.5e18, 0.5e18, 8000, 7500, healthFactor);
     }
 }
 
 // Mock Aave aToken
-contract MockAToken is IERC20 {
+contract MockAToken {
     string public name = "Aave Interest Bearing USDC";
     string public symbol = "aUSDC";
     uint8 public decimals = 6;
@@ -877,6 +1164,9 @@ contract MockAToken is IERC20 {
     
     mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
+    
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
     
     constructor(address underlyingAsset) {
         UNDERLYING_ASSET_ADDRESS = underlyingAsset;
@@ -890,8 +1180,8 @@ contract MockAToken is IERC20 {
     
     function burn(address from, uint256 amount) external {
         require(balanceOf[from] >= amount, "Insufficient balance");
-        balanceOf[from] -= amount;
         totalSupply -= amount;
+        balanceOf[from] -= amount;
         emit Transfer(from, address(0), amount);
     }
     
@@ -909,26 +1199,29 @@ contract MockAToken is IERC20 {
         return true;
     }
     
-    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
+    function transferFrom(
+        address from,
+        address to,
+        uint256 amount
+    ) external returns (bool) {
         require(balanceOf[from] >= amount, "Insufficient balance");
-        if (msg.sender != from) {
+        if (msg.sender != from && allowance[from][msg.sender] != type(uint256).max) {
             require(allowance[from][msg.sender] >= amount, "Insufficient allowance");
             allowance[from][msg.sender] -= amount;
         }
         
         balanceOf[from] -= amount;
         balanceOf[to] += amount;
-        
         emit Transfer(from, to, amount);
         return true;
     }
     
-    function POOL() external view returns (address) {
-        return msg.sender; // For testing
+    function scaledBalanceOf(address user) external view returns (uint256) {
+        return balanceOf[user];
     }
     
-    function getIncentivesController() external pure returns (address) {
-        return address(0);
+    function getScaledUserBalanceAndSupply(address user) external view returns (uint256, uint256) {
+        return (balanceOf[user], totalSupply);
     }
 }
 

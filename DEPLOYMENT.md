@@ -73,7 +73,7 @@ forge script script/Deploy.s.sol:DeployScript \
   --broadcast \
   --verify \
   --verifier-url https://api.basescan.org/api \
-  --etherscan-api-key $BASESCAN_API_KEY \
+  --etherscan-api-key $ETHERSCAN_API_KEY \
   -vvvv
 ```
 
