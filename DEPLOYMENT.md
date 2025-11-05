@@ -1,6 +1,6 @@
 # AAVE Autopilot Vault - Deployment Guide
 
-This guide provides step-by-step instructions for deploying the AAVE Autopilot Vault to Base network.
+This guide provides step-by-step instructions for deploying the AAVE Autopilot Vault to Ethereum Sepolia testnet.
 
 ## Prerequisites
 
@@ -8,12 +8,12 @@ This guide provides step-by-step instructions for deploying the AAVE Autopilot V
    - [Foundry](https://book.getfoundry.org/getting-started/installation) installed
    - [Git](https://git-scm.com/downloads) installed
    - [Node.js](https://nodejs.org/) (v16+ recommended)
-   - A wallet with test ETH on Base Sepolia (get some from [Base Faucet](https://www.coinbase.com/faucets/base-sepolly-faucet))
-   - [Basescan API Key](https://basescan.org/myapikey) for contract verification
+   - A wallet with test ETH on Ethereum Sepolia (get some from [Alchemy Sepolia Faucet](https://sepoliafaucet.com/) or [Infura Faucet](https://www.infura.io/faucet))
+   - [Etherscan API Key](https://etherscan.io/myapikey) for contract verification
 
 2. **Repository Setup**
    ```bash
-   git clone https://github.com/Moses-main/aave-autopilot.gi
+   git clone https://github.com/your-username/aave-autopilot.git
    cd aave-autopilot
    forge install
    ```
@@ -25,13 +25,13 @@ This guide provides step-by-step instructions for deploying the AAVE Autopilot V
    ```bash
    # Deployment
    PRIVATE_KEY=your_wallet_private_key_here
-   RPC_URL=https://sepolia.base.org  # Or your preferred RPC URL
+   RPC_URL=https://eth-sepolia.g.alchemy.com/v2/your-api-key  # Your Sepolia RPC URL
    
    # Verification
-   BASESCAN_API_KEY=your_basescan_api_key_here
+   ETHERSCAN_API_KEY=your_etherscan_api_key_here
    
    # Optional: For mainnet deployment
-   # RPC_URL=https://mainnet.base.org
+   # RPC_URL=https://eth-mainnet.g.alchemy.com/v2/your-api-key
    ```
 
    ⚠️ **Security Note**: Add `.env` to your `.gitignore` to prevent committing sensitive information.
