@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.0 || ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/Ownable2Step.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/Pausable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/IAave.sol";
@@ -17,9 +17,12 @@ import "./interfaces/KeeperCompatibleInterface.sol";
  * @notice ERC-4626 vault that manages Aave v3 positions with automatic health factor monitoring
  * @dev Implements intelligent position management to prevent liquidations
  */
+/// @title AaveAutopilot
+/// @notice ERC-4626 vault with automated Aave v3 position management and Chainlink Automation
+/// @dev Implements reentrancy protection, pausable functionality, and access control
 contract AaveAutopilot is 
     ERC4626, 
-    Ownable, 
+    Ownable2Step, 
     ReentrancyGuard, 
     Pausable, 
     AccessControl, 
@@ -40,6 +43,15 @@ contract AaveAutopilot is
 
     /// @notice Health factor threshold for Keeper check (1.1x)
     uint256 public constant KEEPER_THRESHOLD = 1.1e18;
+    
+    /// @notice Maximum slippage for repayments (1%)
+    uint256 public constant MAX_SLIPPAGE = 1e16; // 1%
+    
+    /// @notice Minimum time between rebalances (1 hour)
+    uint256 public constant REBALANCE_COOLDOWN = 1 hours;
+    
+    /// @notice Maximum number of rebalance attempts in a single transaction
+    uint8 public constant MAX_REBALANCE_ATTEMPTS = 3;
 
     /// @notice Chainlink ETH/USD price feed
     AggregatorV3Interface public immutable ethUsdPriceFeed;
@@ -56,8 +68,8 @@ contract AaveAutopilot is
     /// @notice Track last rebalance timestamp per user
     mapping(address => uint256) public lastRebalanceTimestamp;
     
-    /// @notice Minimum time between rebalances (1 hour)
-    uint256 public constant REBALANCE_COOLDOWN = 1 hours;
+    /// @notice Track rebalance attempt count per user in current transaction
+    mapping(address => uint8) private _rebalanceAttempts;
 
     // ============ Events ============
 
@@ -193,121 +205,9 @@ contract AaveAutopilot is
     // Constants for batch processing and circuit breaker
     uint256 public currentBatchIndex;
     uint256 public constant MAX_REBALANCE_ATTEMPTS = 3;
-    uint256 public constant BATCH_SIZE = 10; // Number of users to process in one batch
     
-    // Track rebalance attempts per user
-    mapping(address => uint256) public rebalanceAttempts;
-    
-    /**
-     * @notice Check if any users need their positions rebalanced
-     * @param checkData Encoded data for the check (can be used to specify batch index)
-     * @return upkeepNeeded Whether upkeep is needed
-     * @return performData Encoded list of users that need rebalancing
-     */
-    function checkUpkeep(
-        bytes calldata checkData
-    ) external override returns (bool upkeepNeeded, bytes memory performData) {
-        // Get the current batch index from checkData or default to 0
-        uint256 batchIndex = checkData.length == 0 ? 0 : abi.decode(checkData, (uint256));
-        
-        // Get all users with active positions (simplified for this example)
-        // In production, you'd want a more efficient way to track users with active positions
-        address[] memory users = _getUsersBatch(batchIndex, BATCH_SIZE);
-        
-        // Check each user's health factor
-        address[] memory usersToRebalance = new address[](users.length);
-        uint256 count = 0;
-        
-        for (uint256 i = 0; i < users.length; i++) {
-            address user = users[i];
-            if (user == address(0)) continue;
-            
-            uint256 healthFactor = getHealthFactor(user);
-            
-            // If health factor is below threshold, add to rebalance list
-            if (healthFactor < KEEPER_THRESHOLD) {
-                usersToRebalance[count] = user;
-                count++;
-                
-                // Emit event for monitoring
-                emit KeeperTriggered(msg.sender, user, healthFactor);
-            }
-        }
-        
-        // If we found users to rebalance, return them
-        if (count > 0) {
-            // Resize the array to the actual number of users needing rebalance
-            assembly {
-                mstore(usersToRebalance, count)
-            }
-            return (true, abi.encode(usersToRebalance));
-        }
-        
-        // If we've processed all batches, reset the index
-        if (users.length < BATCH_SIZE) {
-            currentBatchIndex = 0;
-        } else {
-            currentBatchIndex = batchIndex + 1;
-        }
-        
-        return (false, "");
-    }
-    
-    /**
-     * @notice Perform the rebalancing for users with low health factors
-     * @param performData Encoded list of users to rebalance
-     */
-    function performUpkeep(
-        bytes calldata performData
-    ) external override onlyRole(KEEPER_ROLE) whenNotPaused {
-        address[] memory users = abi.decode(performData, (address[]));
-        
-        for (uint256 i = 0; i < users.length; i++) {
-            address user = users[i];
-            if (user == address(0)) continue;
-            
-            // Skip if we've already tried too many times
-            if (rebalanceAttempts[user] >= MAX_REBALANCE_ATTEMPTS) {
-                emit MaxAttemptsReached(user);
-                continue;
-            }
-            
-            // Get current health factor
-            uint256 currentHf = getHealthFactor(user);
-            
-            // Only proceed if health factor is still below threshold
-            if (currentHf < KEEPER_THRESHOLD) {
-                try this._rebalancePosition(user) {
-                    // Success - reset attempt counter
-                    rebalanceAttempts[user] = 0;
-                    
-                    // Get new health factor
-                    uint256 newHf = getHealthFactor(user);
-                    emit PositionRebalanced(user, currentHf, newHf);
-                } catch Error(string memory reason) {
-                    // Handle reversion with a reason string
-                    rebalanceAttempts[user]++;
-                    emit RebalanceAttempt(user, currentHf, 0, false, reason);
-                } catch {
-                    // Handle other reverts
-                    rebalanceAttempts[user]++;
-                    emit RebalanceAttempt(user, currentHf, 0, false, "Unknown error");
-                }
-            }
-        }
-    }
-    
-    /**
-     * @notice Internal function to get a batch of users with active positions
-     * @dev This is a simplified version - in production, you'd want a more efficient way
-     * to track users with active positions
-     */
-    function _getUsersBatch(uint256 startIndex, uint256 batchSize) internal view returns (address[] memory) {
-        // In a real implementation, you'd want to track users with active positions
-        // For this example, we'll return an empty array
-        address[] memory users = new address[](0);
-        return users;
-    }
+    // Track rebalance attempts per user (resets each transaction)
+    mapping(address => uint8) private _rebalanceAttempts;
     
     /**
      * @notice Method called by Chainlink Keepers to check if upkeep is needed
@@ -315,40 +215,33 @@ contract AaveAutopilot is
      */
     function checkUpkeep(
         bytes calldata checkData
-    ) external view override returns (bool upkeepNeeded, bytes memory performData) {
-        // If specific user is provided in checkData, check only that user
-        if (checkData.length > 0) {
-            address user = abi.decode(checkData, (address));
-            uint256 userHf = getHealthFactor(user);
-            uint256 userLastRebalance = lastRebalanceTimestamp[user];
-            bool userTimePassed = block.timestamp - userLastRebalance >= REBALANCE_COOLDOWN;
-            bool userNeedsRebalance = userHf < KEEPER_THRESHOLD && 
-                                    userHf > 0 && 
-                                    rebalanceAttempts[user] < MAX_REBALANCE_ATTEMPTS &&
-                                    userTimePassed;
+    ) 
+        external 
+        view 
+        override 
+        returns (bool upkeepNeeded, bytes memory performData) 
+    {
+        // Decode checkData if provided, otherwise use default values
+        (uint256 maxUsers, uint256 minHealthFactor) = checkData.length > 0 
+            ? abi.decode(checkData, (uint256, uint256))
+            : (50, KEEPER_THRESHOLD);
             
-            if (userNeedsRebalance) {
-                address[] memory usersToRebalance = new address[](1);
-                usersToRebalance[0] = user;
-                return (true, abi.encode(usersToRebalance));
-            }
+        // In a production environment, you would query a list of users from storage
+        // For this example, we'll use a simplified approach with a single user
+        address[] memory users = new address[](1);
+        users[0] = address(this);
+        
+        // Check health factor for each user
+        uint256 healthFactor = getHealthFactor(users[0]);
+        upkeepNeeded = healthFactor < minHealthFactor;
+        
+        // If no users need rebalancing, return early
+        if (!upkeepNeeded) {
+            return (false, bytes(""));
         }
         
-        // In production, implement batch processing of users
-        // For demo, we'll use a simplified approach with currentBatchIndex
-        address[] memory usersToCheck = new address[](1);
-        address currentUser = msg.sender; // Replace with actual batch processing
-        usersToCheck[0] = currentUser;
-        
-        uint256 currentHf = getHealthFactor(currentUser);
-        uint256 currentUserLastRebalance = lastRebalanceTimestamp[currentUser];
-        bool currentTimePassed = block.timestamp - currentUserLastRebalance >= REBALANCE_COOLDOWN;
-        bool currentNeedsRebalance = currentHf < KEEPER_THRESHOLD && 
-                                   currentHf > 0 && 
-                                   rebalanceAttempts[currentUser] < MAX_REBALANCE_ATTEMPTS &&
-                                   currentTimePassed;
-        
-        return (currentNeedsRebalance, abi.encode(usersToCheck));
+        // Return the list of users that need rebalancing
+        return (true, abi.encode(users));
     }
     
     /**
@@ -357,46 +250,62 @@ contract AaveAutopilot is
      */
     function performUpkeep(
         bytes calldata performData
-    ) external override onlyRole(KEEPER_ROLE) whenNotPaused {
+    ) 
+        external 
+        override 
+        onlyRole(KEEPER_ROLE) 
+        whenNotPaused 
+        nonReentrant
+    {
         address[] memory users = abi.decode(performData, (address[]));
+        uint256 gasLeft = gasleft();
+        uint256 gasUsed = 0;
+        uint256 gasLimit = block.gaslimit - 100000; // Leave some gas for final operations
         
         for (uint256 i = 0; i < users.length; i++) {
-            address user = users[i];
-            uint256 oldHealthFactor = getHealthFactor(user);
+            // Check if we have enough gas left
+            if (gasUsed + 100000 > gasLimit) { // Reserve 100k gas per iteration
+                break;
+            }
             
-            // Skip if user doesn't need rebalancing or has exceeded max attempts
-            if (oldHealthFactor >= KEEPER_THRESHOLD || 
-                oldHealthFactor == 0 || 
-                rebalanceAttempts[user] >= MAX_REBALANCE_ATTEMPTS) {
+            address user = users[i];
+            uint256 initialGas = gasleft();
+            
+            // Reset rebalance attempts at the start of each transaction
+            if (_rebalanceAttempts[user] == 0) {
+                _rebalanceAttempts[user] = 1;
+            } else if (_rebalanceAttempts[user] >= MAX_REBALANCE_ATTEMPTS) {
+                emit MaxAttemptsReached(user);
+                continue;
+            } else {
+                _rebalanceAttempts[user]++;
+            }
+            
+            // Skip if cooldown not met
+            if (block.timestamp < lastRebalanceTimestamp[user] + REBALANCE_COOLDOWN) {
                 continue;
             }
             
-            try this._rebalancePosition(user) {
-                // Success - reset attempt counter
-                rebalanceAttempts[user] = 0;
-                emit PositionRebalanced(user, oldHealthFactor, getHealthFactor(user));
-                emit RebalanceAttempt(user, oldHealthFactor, getHealthFactor(user), true, "");
+            // Check health factor
+            uint256 healthFactor = getHealthFactor(user);
+            if (healthFactor >= KEEPER_THRESHOLD) {
+                continue;
+            }
+            
+try this._rebalancePosition(user) {
+                // Update last rebalance timestamp on success
+                lastRebalanceTimestamp[user] = block.timestamp;
+                emit PositionRebalanced(user, healthFactor, getHealthFactor(user));
             } catch Error(string memory reason) {
-                // Increment attempt counter on failure
-                rebalanceAttempts[user]++;
-                emit RebalanceAttempt(user, oldHealthFactor, 0, false, reason);
-                
-                if (rebalanceAttempts[user] >= MAX_REBALANCE_ATTEMPTS) {
-                    emit MaxAttemptsReached(user);
-                }
+                emit RebalanceAttempt(user, healthFactor, getHealthFactor(user), false, reason);
             } catch (bytes memory) {
-                // Catch any other errors
-                rebalanceAttempts[user]++;
-                emit RebalanceAttempt(user, oldHealthFactor, 0, false, "Unknown error");
-                
-                if (rebalanceAttempts[user] >= MAX_REBALANCE_ATTEMPTS) {
-                    emit MaxAttemptsReached(user);
-                }
+                emit RebalanceAttempt(user, healthFactor, getHealthFactor(user), false, "Unknown error");
+            }
             }
         }
         
-        // Update batch index for next run
-        currentBatchIndex = (currentBatchIndex + 1) % 10;
+        // Update batch index for next run (uncomment if batch processing is implemented)
+        // currentBatchIndex = (currentBatchIndex + 1) % 10;
     }
     
     // ============ Health Factor Management ============
@@ -433,7 +342,7 @@ contract AaveAutopilot is
     
     /**
      * @notice Get the current ETH price in USD from Chainlink
-     * @return price The current ETH price (scaled to 8 decimals)
+     * @return The ETH price with 8 decimals
      */
     function getEthPrice() public view returns (uint256) {
         (
@@ -447,6 +356,17 @@ contract AaveAutopilot is
         return uint256(price);
     }
     
+    /**
+     * @notice Get the current asset price in ETH
+     * @return The asset price with 18 decimals
+     * @dev In a production environment, you would use a price oracle like Chainlink
+     * For this example, we'll assume the asset is USDC and return a fixed price
+     */
+    function getAssetPrice() public view returns (uint256) {
+        // In a real implementation, you would get the asset price from a price oracle
+        // For Base Sepolia, you would use the appropriate Chainlink price feed
+        return 1e18; // 1 USDC = 1e18 wei (for testing)
+    }
     
     /**
      * @notice Check and adjust the position's health factor
@@ -462,51 +382,95 @@ contract AaveAutopilot is
      * @notice Internal function to rebalance the position
      * @param user Address of the user whose position needs rebalancing
      */
+    /**
+     * @notice Internal function to rebalance a user's position
+     * @param user Address of the user to rebalance
+     * @dev This function is called by performUpkeep and should not be called directly
+     */
+    /**
+     * @notice Internal function to rebalance a user's position
+     * @param user Address of the user to rebalance
+     * @dev This function is called by performUpkeep and should not be called directly
+     */
     function _rebalancePosition(address user) external {
-        // This function is called via try/catch, so we use a reentrancy guard
         require(msg.sender == address(this), "Only callable internally");
         
         uint256 currentHf = getHealthFactor(user);
-        require(currentHf < MIN_HEALTH_FACTOR, "Health factor is safe");
+        require(currentHf < KEEPER_THRESHOLD, "Health factor above threshold");
         
-        // Get current debt and collateral from Aave
-        (uint256 totalCollateralETH, uint256 totalDebtETH, , , , ) = aaveDataProvider.getUserAccountData(address(this));
+        // Get current position data from Aave
+        (
+            uint256 totalCollateralETH,
+            uint256 totalDebtETH,
+            uint256 availableBorrowsETH,
+            uint256 currentLiquidationThreshold,
+            uint256 ltv,
+            uint256 healthFactor
+        ) = aaveDataProvider.getUserAccountData(user);
         
-        // Calculate how much to repay to reach target health factor
+        // Calculate the target debt to reach TARGET_HEALTH_FACTOR
+        uint256 targetDebtETH = (totalCollateralETH * currentLiquidationThreshold * 1e4) / (TARGET_HEALTH_FACTOR * 1e4 / 1e18);
+        
+        // If current debt is already below target, no need to rebalance
+        if (totalDebtETH <= targetDebtETH) {
+            emit PositionAdjusted(currentHf, getHealthFactor(user));
+            return;
+        }
+        
+        // Calculate the amount to repay (in ETH terms)
+        uint256 repayAmountETH = totalDebtETH - targetDebtETH;
+        
+        // Get the underlying asset price in ETH
         uint256 ethPrice = getEthPrice();
-        uint256 targetDebt = (totalDebtETH * currentHf) / TARGET_HEALTH_FACTOR;
-        uint256 repayAmountETH = totalDebtETH - targetDebt;
+        uint256 assetPrice = getAssetPrice();
         
-        if (repayAmountETH > 0) {
-            // Convert ETH amount to asset amount (adjust decimals as needed)
-            uint256 repayAmount = (repayAmountETH * 1e8) / ethPrice;
+        // Convert repay amount from ETH to asset amount (with 18 decimals)
+        uint256 repayAmount = (repayAmountETH * 1e18) / assetPrice;
+        
+        // Get available liquidity
+        uint256 availableLiquidity = IERC20(asset()).balanceOf(address(this));
+        
+        // If we don't have enough liquidity, try to withdraw from Aave
+        if (repayAmount > availableLiquidity) {
+            // Calculate how much we can safely withdraw (in asset terms)
+            uint256 withdrawAmount = repayAmount - availableLiquidity;
             
-            // Check if we have enough liquidity to repay
-            uint256 availableLiquidity = IERC20(asset()).balanceOf(address(this));
+            // Make sure we're not withdrawing more than our aToken balance
+            uint256 aTokenBalance = IAToken(aToken).balanceOf(address(this));
+            if (withdrawAmount > aTokenBalance) {
+                withdrawAmount = aTokenBalance;
+            }
             
-            if (repayAmount > availableLiquidity) {
-                // Calculate how much we can safely withdraw
-                uint256 maxWithdraw = totalCollateralETH - (totalDebtETH * 1e18) / MIN_HEALTH_FACTOR;
-                uint256 needed = repayAmount - availableLiquidity;
-                uint256 withdrawAmount = needed > maxWithdraw ? maxWithdraw : needed;
-                
-                if (withdrawAmount > 0) {
-                    // Withdraw from Aave
-                    aavePool.withdraw(asset(), withdrawAmount, address(this));
-                }
-                
+            // Make sure we don't withdraw too much and go below MIN_HEALTH_FACTOR
+            uint256 maxWithdraw = (totalCollateralETH * 1e18 - (totalDebtETH * 1e18) / MIN_HEALTH_FACTOR) * assetPrice / 1e18;
+            if (withdrawAmount > maxWithdraw) {
+                withdrawAmount = maxWithdraw;
+            }
+            
+            // Withdraw from Aave if we have something to withdraw
+            if (withdrawAmount > 0) {
+                aavePool.withdraw(asset(), withdrawAmount, address(this));
                 // Update available liquidity after withdrawal
                 availableLiquidity = IERC20(asset()).balanceOf(address(this));
             }
-            
-            // Repay debt with available liquidity (don't try to repay more than we have)
-            uint256 actualRepayAmount = repayAmount > availableLiquidity ? availableLiquidity : repayAmount;
-            if (actualRepayAmount > 0) {
-                aavePool.repay(asset(), actualRepayAmount, 2, address(this));
-            }
         }
         
-        emit PositionAdjusted(currentHf, getCurrentHealthFactor());
+        // Make sure we don't try to repay more than we have
+        if (repayAmount > availableLiquidity) {
+            repayAmount = availableLiquidity;
+        }
+        
+        // Approve Aave to spend the asset if we have something to repay
+        if (repayAmount > 0) {
+            IERC20(asset()).safeApprove(address(aavePool), 0); // Reset approval
+            IERC20(asset()).safeApprove(address(aavePool), repayAmount);
+            
+            // Repay the debt (using rate mode 2 for variable rate)
+            aavePool.repay(asset(), repayAmount, 2, user);
+        }
+        
+        // Emit event with old and new health factors
+        emit PositionAdjusted(currentHf, getHealthFactor(user));
     }
     
     // ============ Admin Functions ============

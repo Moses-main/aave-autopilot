@@ -7,8 +7,8 @@
   },
   "lib/chainlink": {
     "tag": {
-      "name": "v0.8.1",
-      "rev": "8054cf761b4d3625b81184080b1e6396c0e0de05"
+      "name": "v0.8.0",
+      "rev": "12549dbeea284e31c27a46c05af56805a039ff4e"
     }
   },
   "lib/forge-std": {
@@ -19,14 +19,14 @@
   },
   "lib/openzeppelin-contracts": {
     "tag": {
-      "name": "v5.5.0",
-      "rev": "fcbae5394ae8ad52d8e580a3477db99814b9d565"
+      "name": "v4.9.5",
+      "rev": "bd325d56b4c62c9c5c1aff048c37c6bb18ac0290"
     }
   },
   "lib/openzeppelin-contracts-upgradeable": {
     "tag": {
-      "name": "v4.9.3",
-      "rev": "3d4c0d5741b131c231e558d7a6213392ab3672a5"
+      "name": "v4.9.5",
+      "rev": "a40cb0bda838c2ef3dfc252c179f5c37c32e80c4"
     }
   }
 }

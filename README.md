@@ -1,19 +1,20 @@
-# 🚀 AAVE Autopilot Vault
+# 🚀 AAVE Autopilot Vault (Sepolia)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Built with Foundry](https://img.shields.io/badge/Built%20with-Foundry-FFDB1C.svg)](https://getfoundry.sh/)
 [![Test Status](https://github.com/Moses-main/aave-autopilot/actions/workflows/test.yml/badge.svg)](https://github.com/Moses-main/aave-autopilot/actions)
 [![Coverage Status](https://coveralls.io/repos/github/Moses-main/aave-autopilot/badge.svg?branch=main)](https://coveralls.io/github/Moses-main/aave-autopilot?branch=main)
 
-An ERC-4626 vault that automates Aave v3 position management with Chainlink Automation to prevent liquidations.
+An ERC-4626 vault that automates Aave v3 position management on Sepolia with Chainlink Automation to prevent liquidations.
 
 ## Features
 
-- **Automated Health Factor Management**: Monitors and maintains healthy positions on Aave v3
+- **Automated Health Factor Management**: Monitors and maintains healthy positions on Aave v3 (Sepolia)
 - **Chainlink Automation**: Uses Chainlink Keepers for automated rebalancing
-- **Gas Efficient**: Optimized for minimal gas usage
+- **Gas Efficient**: Optimized for minimal gas usage on Sepolia
 - **Secure**: Implements OpenZeppelin's security patterns
 - **Fork Testing**: Supports local forked testing on Ethereum Sepolia
+- **Sepolia Deployment**: Pre-configured for Ethereum Sepolia testnet
 
 ## Architecture
 
@@ -37,15 +38,28 @@ An ERC-4626 vault that automates Aave v3 position management with Chainlink Auto
 ### Prerequisites
 
 - [Foundry](https://book.getfoundry.sh/getting-started/installation)
-- [Node.js](https://nodejs.org/) (for additional tooling)
+- [jq](https://stedolan.github.io/jq/download/) (for deployment scripts)
 - [Git](https://git-scm.com/)
+- [Sepolia ETH](https://sepoliafaucet.com/)
+- [Sepolia LINK](https://faucets.chain.link/sepolia)
 
 ### Installation
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/aave-autopilot.git
+   git clone https://github.com/Moses-main/aave-autopilot.git
    cd aave-autopilot
+   ```
+
+2. Install dependencies:
+   ```bash
+   forge install
+   ```
+
+3. Set up environment variables:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your private key and API keys
    ```
 
 2. Install dependencies:
@@ -68,26 +82,28 @@ An ERC-4626 vault that automates Aave v3 position management with Chainlink Auto
    # Contract addresses (Ethereum Sepolia)
    VAULT_ADDRESS=0xaE2202566bE5325e2A5746b66E13F0D6f7E248b6
    ```
-   
-   ⚠️ **Important**: Never commit your `.env` file to version control. Add it to `.gitignore`.
 
 ## Testing
 
 ### Run Tests
 
 ```bash
-forge test -vv
-```
+# Run unit tests
+forge test
 
-### Run Tests with Coverage
+# Run tests with gas report
+forge test --gas-report
 
-```bash
-forge coverage --report lcov && genhtml lcov.info --output-dir coverage
+# Run forked tests against Sepolia
+forge test --fork-url $SEPOLIA_RPC_URL -vvv
+
+# Run with coverage report
+forge coverage --fork-url $SEPOLIA_RPC_URL
 ```
 
 ## Deployment
 
-### Local Fork Testing
+### Deploy to Sepolia
 
 1. Start a local Anvil node forked from Sepolia:
    ```bash
