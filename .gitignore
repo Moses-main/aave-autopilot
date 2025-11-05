@@ -10,5 +10,8 @@ out/
 # Docs
 docs/
 
+# Script
+*script
+
 # Dotenv file
 .env

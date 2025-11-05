@@ -184,7 +184,7 @@ The AAVE Autopilot Vault provides a simple interface for users to deposit USDC, 
 - **Automated Health Factor Management**: Continuously monitors and maintains optimal health factor (target: 1.5x, minimum: 1.05x)
 - **Chainlink Price Feeds**: Uses real-time ETH/USD price data for accurate collateral valuation
 - **Chainlink Keepers Integration**: Automated rebalancing when health factor falls below threshold (1.1x)
-- **Gas Optimization**: Optimized for Base network's gas efficiency with minimal external calls
+- **Gas Optimization**: Optimized for network's gas efficiency with minimal external calls
 - **Security First**: Implements reentrancy protection, pausable functionality, and access control
 - **ERC-4626 Standard**: Fully compliant with the ERC-4626 tokenized vault standard
 - **Comprehensive Testing**: Extensive test suite covering edge cases and security scenarios
@@ -194,7 +194,7 @@ The AAVE Autopilot Vault provides a simple interface for users to deposit USDC, 
 
 ### Current Stage: Beta (Testnet)
 
-- **Deployed Contract Address (Base Sepolia)**: [`0xb896DaacC1987B2A547e101EA8334Cf3aB0AC19a`](https://sepolia.basescan.org/address/0xb896DaacC1987B2A547e101EA8334Cf3aB0AC19a)
+- **Deployed Contract Address ( Sepolia ETH)**: [`0xaE2202566bE5325e2A5746b66E13F0D6f7E248b6`](https://sepolia.etherscan.io/address/0xaE2202566bE5325e2A5746b66E13F0D6f7E248b6)
 - **Test Coverage**: 85%+
 - **Audit Status**: Pending
 - **Mainnet Readiness**: Under Review
@@ -258,12 +258,12 @@ forge test --match-test testDeposit -vvv
 ```bash
 # Required
 PRIVATE_KEY=your_private_key_here
-RPC_URL=https://sepolia.base.org
+RPC_URL=https://virtual.mainnet.eu.rpc.tenderly.co/your-api-key
 
 # Optional (for verification)
 ETHERSCAN_API_KEY=your_etherscan_api_key
 
-# Testnet Configuration (Base Sepolia)
+# Testnet Configuration ( Sepolia ETH)
 USDC=0x036CbD53842c5426634e7929541eC2318f3dCF7e
 AAVE_POOL=0x6dcb6D1E0D487EDAE6B45D1d1B86e1A4AD8d4a2C
 AAVE_DATA_PROVIDER=0x2d8A3C5677189723C4cB8873CfC9C8976FDF38Ac
@@ -273,10 +273,10 @@ ETH_USD_PRICE_FEED=0x71041DDDAd094AE566B4d4cd0FA6C97e45B01E60
 
 ### Deployed Contract Details
 
-#### Base Sepolia
+#### Sepolia ETH
 
 ```
-Contract Address: 0xb896DaacC1987B2A547e101EA8334Cf3aB0AC19a
+Contract Address: 0xaE2202566bE5325e2A5746b66E13F0D6f7E248b6
 Constructor Parameters:
   - USDC: 0x036CbD53842c5426634e7929541eC2318f3dCF7e
   - AAVE_POOL: 0x6dcb6D1E0D487EDAE6B45D1d1B86e1A4AD8d4a2C
@@ -290,7 +290,7 @@ Constructor Parameters:
   - Max Slippage: 1%
 ```
 
-### Deploy to Base Sepolia
+### Deploy to Sepolia
 
 1. Deploy the contract:
 
@@ -354,9 +354,9 @@ forge verify-contract \
 forge script script/Deploy.s.sol:DeployScript --rpc-url $RPC_URL --broadcast --verify -vvvv
 ```
 
-### Deployed Addresses (Base Sepolia)
+### Deployed Addresses ( Sepolia ETH)
 
-- **AaveAutopilot**: `0xb896DaacC1987B2A547e101EA8334Cf3aB0AC19a`
+- **AaveAutopilot**: `0xaE2202566bE5325e2A5746b66E13F0D6f7E248b6`
 - **USDC**: `0x036CbD53842c5426634e7929541eC2318f3dCF7e`
 - **Aave Pool**: `0x6dcb6d1e0d487edae6b45d1d1b86e1a4ad8d4a2c`
 - **ETH/USD Price Feed**: `0x71041dddad094ae566b4d4cd0fa6c97e45b01e60`
@@ -448,24 +448,24 @@ forge script script/Deploy.s.sol:DeployScript --rpc-url $RPC_URL --broadcast --v
 
 ### APY Simulation
 Based on current AAVE v3 rates and historical performance:
-- Estimated Base APY: 2-4% (USDC supply)
+- Estimated ETH APY: 2-4% (USDC supply)
 - Additional yield from leverage: 3-6%
 - Net APY after fees: 4-8%
 
 ## 📅 Development Roadmap
 
-### Short-term (Q4 2023)
+### Short-term (Q4 2025)
 - [ ] Complete security audit
-- [ ] Deploy to Base mainnet
+- [ ] Deploy to ETH MAINNET
 - [ ] Implement frontend dashboard
 - [ ] Add multi-collateral support
 
-### Medium-term (Q1 2024)
+### Medium-term (Q1 2026)
 - [ ] Cross-chain deployment (Optimism, Arbitrum)
 - [ ] Advanced strategies (LP positions, yield optimization)
 - [ ] DAO governance
 
-### Long-term (2024+)
+### Long-term (2026+)
 - [ ] Permissionless strategy marketplace
 - [ ] Advanced risk management
 - [ ] Institutional features
@@ -494,7 +494,7 @@ forge test --match-test testDeposit -vvv
 ### Deploy
 
 ```bash
-# Deploy to Base Sepolia
+# Deploy to Sepolia ETH
 forge script script/Deploy.s.sol:DeployScript \
   --rpc-url $RPC_URL \
   --private-key $PRIVATE_KEY \
@@ -511,7 +511,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - [AAVE](https://aave.com/) team for the amazing lending protocol
 - [Chainlink](https://chain.link/) for price feeds and keepers
-- [Base](https://base.org/) team for the scaling solution
 - [OpenZeppelin](https://openzeppelin.com/) for battle-tested contracts
 - All contributors and testers
 ```

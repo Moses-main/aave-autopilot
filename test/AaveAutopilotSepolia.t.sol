@@ -4,14 +4,52 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 import "../src/AaveAutopilot.sol";
 
+// Wrapper contract to expose internal functions for testing
+contract AaveAutopilotWrapper is AaveAutopilot {
+    constructor(
+        IERC20 _asset,
+        string memory _name,
+        string memory _symbol,
+        address _aavePool,
+        address _aaveDataProvider,
+        address _aToken,
+        address _ethUsdPriceFeed,
+        address _owner
+    ) AaveAutopilot(
+        _asset,
+        _name,
+        _symbol,
+        _aavePool,
+        _aaveDataProvider,
+        _aToken,
+        _ethUsdPriceFeed,
+        _owner
+    ) {}
+    
+    // Wrapper to expose _getHealthFactorView for testing
+    function getHealthFactorView(address user) external view returns (uint256) {
+        return _getHealthFactorView(user);
+    }
+}
+
 contract AaveAutopilotSepoliaTest is Test {
-    // Sepolia addresses
-    address constant USDC = 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238; // Sepolia USDC
-    address constant AAVE_POOL = 0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951; // Sepolia Aave Pool
-    address constant AAVE_DATA_PROVIDER = 0x3e9708D80F7b3e431180130bF478987472f950aF; // Sepolia Aave Data Provider
-    address constant A_USDC = 0x16dA4541aD1807f4443d92D26044C1147406EB80; // Sepolia aUSDC
-    address constant ETH_USD_PRICE_FEED = 0x694AA1769357215DE4FAC081bf1f309aDC325306; // Sepolia ETH/USD Price Feed
-    address constant LINK_TOKEN = 0x779877A7B0D9E8603169DdbD7836e478b4624789; // Sepolia LINK
+    // Sepolia addresses (as strings to avoid checksum issues)
+    string constant USDC_STR = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"; // Sepolia USDC
+    string constant AAVE_POOL_STR = "0x6Ae43d3271fF6888e7Fc43Fd7321a503fF738951"; // Aave V3 Pool
+    string constant AAVE_DATA_PROVIDER_STR = "0x7B4EB56E7CD4b454BA8fF71E4518426369a138a3"; // Aave Data Provider
+    string constant A_USDC_STR = "0x16dA4541aD1807f4443d92D26044C1147406EB80"; // aUSDC Token
+    string constant ETH_USD_PRICE_FEED_STR = "0x694AA1769357215DE4FAC081bf1f309aDC325306"; // Chainlink ETH/USD
+    string constant KEEPER_REGISTRY_STR = "0xE16Df59B403e9B01F5f28a3b09a4e71c9F3509dF"; // Chainlink Keeper Registry
+    string constant LINK_TOKEN_STR = "0x779877A7B0D9E8603169DdbD7836e478b4624789"; // LINK Token on Sepolia
+    
+    // Address variables
+    address USDC;
+    address AAVE_POOL;
+    address AAVE_DATA_PROVIDER;
+    address A_USDC;
+    address ETH_USD_PRICE_FEED;
+    address KEEPER_REGISTRY;
+    address LINK_TOKEN;
     
     // Test accounts
     address deployer = makeAddr("deployer");
@@ -19,24 +57,36 @@ contract AaveAutopilotSepoliaTest is Test {
     address keeper = makeAddr("keeper");
     
     // Contract instances
-    AaveAutopilot public autopilot;
+    AaveAutopilotWrapper public autopilot;
     
     // Fork setup
     uint256 sepoliaFork;
     string SEPOLIA_RPC_URL = vm.envString("SEPOLIA_RPC_URL");
     
     function setUp() public {
-        // Create a fork of Sepolia
-        sepoliaFork = vm.createFork(SEPOLIA_RPC_URL);
-        vm.selectFork(sepoliaFork);
+        // Parse all addresses from strings
+        USDC = vm.parseAddress(USDC_STR);
+        AAVE_POOL = vm.parseAddress(AAVE_POOL_STR);
+        AAVE_DATA_PROVIDER = vm.parseAddress(AAVE_DATA_PROVIDER_STR);
+        A_USDC = vm.parseAddress(A_USDC_STR);
+        ETH_USD_PRICE_FEED = vm.parseAddress(ETH_USD_PRICE_FEED_STR);
+        KEEPER_REGISTRY = vm.parseAddress(KEEPER_REGISTRY_STR);
+        LINK_TOKEN = vm.parseAddress(LINK_TOKEN_STR);
+        
+        // Fork Sepolia at a specific block
+        uint256 forkBlock = 5_000_000; // Adjust to a recent block number
+        string memory rpcUrl = vm.envString("SEPOLIA_RPC_URL");
+        uint256 forkId = vm.createFork(rpcUrl, forkBlock);
+        vm.selectFork(forkId);
         
         // Deploy the contract
         vm.startPrank(deployer);
-        autopilot = new AaveAutopilot(
+        // Deploy AaveAutopilotWrapper
+        autopilot = new AaveAutopilotWrapper(
             IERC20(USDC),
             "Aave Autopilot USDC",
             "apUSDC",
-            IPool(AAVE_POOL),
+            AAVE_POOL, // Pass address directly, not IPool
             AAVE_DATA_PROVIDER,
             A_USDC,
             ETH_USD_PRICE_FEED,
@@ -52,15 +102,15 @@ contract AaveAutopilotSepoliaTest is Test {
         vm.deal(keeper, 10 ether);
     }
     
-    function testDeployment() public {
+    function testDeployment() public view {
         assertEq(autopilot.name(), "Aave Autopilot USDC");
         assertEq(autopilot.symbol(), "apUSDC");
         assertEq(autopilot.owner(), deployer);
     }
     
     function testDepositAndWithdraw() public {
-        // Impersonate a user with USDC
-        address usdcWhale = 0x6E5B0aDDb50a5a4d2C4e3A8D0a1C1C5e4F5E6D7C; // Example whale address
+        // Use the test contract itself as the USDC holder for testing
+        address usdcWhale = address(this);
         vm.startPrank(usdcWhale);
         
         // Approve autopilot to spend USDC
@@ -99,9 +149,9 @@ contract AaveAutopilotSepoliaTest is Test {
         vm.stopPrank();
     }
     
-    function testHealthFactorCalculation() public view {
+    function testHealthFactorCalculation() public {
         // Test health factor calculation
-        uint256 healthFactor = autopilot.getHealthFactor(user1);
+        uint256 healthFactor = autopilot.getHealthFactorView(user1);
         assertGt(healthFactor, 0, "Health factor should be greater than 0");
     }
 }

@@ -69,10 +69,9 @@ contract DeployScript is Script {
     
     /**
      * @notice Verify contract deployment on Etherscan
-     * @param contractAddress The address of the deployed contract
      */
-    function verifyContract(address contractAddress) external {
-        string[] memory verifyParams = new string[](2);
+    function verifyContract() external pure {
+        string[] memory verifyParams = new string[](5);
         verifyParams[0] = "verify:verify";
         verifyParams[1] = "--network";
         verifyParams[2] = "base-sepolia";
