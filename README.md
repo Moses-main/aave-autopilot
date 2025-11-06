@@ -201,12 +201,15 @@ The AAVE Autopilot Vault provides a simple interface for users to deposit USDC, 
 
 ## 🚀 Project Status
 
-### Current Stage: Beta (Testnet)
+### Current Stage: Beta (Tenderly Fork)
 
-- **Deployed Contract Address ( Sepolia ETH)**: [`0xaE2202566bE5325e2A5746b66E13F0D6f7E248b6`](https://sepolia.etherscan.io/address/0xaE2202566bE5325e2A5746b66E13F0D6f7E248b6)
+- **Deployed Contract Address (Tenderly Fork)**: [`0x129918F79fB60dc1AC3f07316f0683f9Fa356178`](https://dashboard.tenderly.co/contract/mainnet/0x129918F79fB60dc1AC3f07316f0683f9Fa356178)
 - **Test Coverage**: 85%+
 - **Audit Status**: Pending
 - **Mainnet Readiness**: Under Review
+
+### Previous Deployments
+- **Sepolia Testnet**: [`0xaE2202566bE5325e2A5746b66E13F0D6f7E248b6`](https://sepolia.etherscan.io/address/0xaE2202566bE5325e2A5746b66E13F0D6f7E248b6)
 
 ### Key Milestones
 
