@@ -11,7 +11,7 @@ out/
 docs/
 
 # Script
-# *script
+*script
 
 # Dotenv file
 .env
