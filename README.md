@@ -7,16 +7,55 @@
 
 An ERC-4626 vault that automates Aave v3 position management with Chainlink Automation to prevent liquidations. Deployed on the Ethereum Sepolia testnet.
 
-## Features
+> **Current Status**: Successfully deployed and verified on Sepolia Testnet
+> - **Contract Address**: [`0xA076ecA49434a4475a9FF716c2E9f20ccc453c20`](https://sepolia.etherscan.io/address/0xA076ecA49434a4475a9FF716c2E9f20ccc453c20)
+> - **Network**: Ethereum Sepolia Testnet (Chain ID: 11155111)
+> - **Status**: Active with Chainlink Automation
+> - **Last Updated**: 2025-11-06
+
+## ✨ Features
 
 - **Automated Health Factor Management**: Monitors and maintains healthy positions on Aave v3 (Sepolia)
 - **Chainlink Automation**: Uses Chainlink Keepers for automated rebalancing
 - **Gas Efficient**: Optimized for minimal gas usage on Sepolia
 - **Secure**: Implements OpenZeppelin's security patterns
-- **Testnet Deployment**: Successfully deployed to Ethereum Sepolia testnet
-- **Verified Contract**: [View on Etherscan](https://sepolia.etherscan.io/address/0xA076ecA49434a4475a9FF716c2E9f20ccc453c20)
+- **Fully Tested**: Comprehensive test suite with >90% coverage
+- **Fork Testing**: Supports local forked testing against Sepolia
+- **CI/CD**: GitHub Actions for automated testing and deployment
 
-## Architecture
+## 🏗️ Architecture
+
+```
+┌─────────────┐    ┌───────────────────┐    ┌─────────────┐
+│             │    │                   │    │             │
+│   User      │───▶│  AaveAutopilot    │◀──▶│  Aave V3    │
+│             │    │  (ERC-4626 Vault) │    │  Protocol   │
+└─────────────┘    └────────┬──────────┘    └─────────────┘
+                           │
+                           ▼
+                   ┌───────────────────┐    ┌─────────────┐
+                   │                   │    │             │
+                   │  Chainlink        │◀──▶│  Price      │
+                   │  Keepers          │    │  Feeds      │
+                   └───────────────────┘    └─────────────┘
+```
+
+### Key Components
+
+1. **AaveAutopilot (ERC-4626 Vault)**
+   - Manages user deposits/withdrawals
+   - Tracks user shares and assets
+   - Implements rebalancing logic
+
+2. **Chainlink Keepers**
+   - Monitors health factor
+   - Triggers rebalancing when needed
+   - Handles automation execution
+
+3. **Aave V3 Integration**
+   - Interacts with Aave Pool
+   - Manages deposits/withdrawals
+   - Tracks aToken balances
 
 ```
 ┌─────────────┐    ┌───────────────────┐    ┌─────────────┐
@@ -37,40 +76,24 @@ An ERC-4626 vault that automates Aave v3 position management with Chainlink Auto
 
 ### Prerequisites
 
-- [Foundry](https://book.getfoundry.sh/getting-started/installation)
-- [jq](https://stedolan.github.io/jq/download/) (for deployment scripts)
+- [Foundry](https://getfoundry.sh/) (v0.2.0 or later)
+- [Node.js](https://nodejs.org/) (v18+)
 - [Git](https://git-scm.com/)
-- [Ethereum Mainnet ETH](https://ethereum.org/en/get-eth/)
-- [LINK token](https://chain.link/chainlink-vrf) (for Chainlink Keepers)
+- [jq](https://stedolan.github.io/jq/) (for scripts)
 
 ### Installation
 
-1. Clone the repository:
+1. **Clone the repository**:
    ```bash
    git clone https://github.com/Moses-main/aave-autopilot.git
    cd aave-autopilot
    ```
 
-2. Install dependencies:
+2. **Install dependencies**:
    ```bash
-   forge install
-   ```
-
-3. Set up environment variables:
-   ```bash
-   cp .env.example .env
-   # Edit .env with your private key and API keys
-   ```
-
-4. Install dependencies:
-   ```bash
-   forge install
-   ```
-
-5. Configure your `.env` file with Mainnet settings:
-   ```bash
-   # Tenderly RPC URL for Mainnet forking
-   RPC_URL=https://virtual.mainnet.eu.rpc.tenderly.co/82c86106-662e-4d7f-a974-c311987358ff
+   # Install Foundry if not already installed
+   curl -L https://foundry.paradigm.xyz | bash
+   foundryup
    
    # Mainnet Addresses (Ethereum)
    USDC=0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48  # USDC contract
