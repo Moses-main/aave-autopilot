@@ -6,19 +6,20 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title FundWithLink
- * @notice Script to fund the AaveAutopilot contract with LINK tokens for Chainlink Keepers
- * @dev Make sure to set the PRIVATE_KEY environment variable before running
+ * @notice Script to fund the AaveAutopilot contract with LINK tokens on Sepolia
+ * @dev Make sure to set the PRIVATE_KEY and RPC_URL environment variables before running
  */
 contract FundWithLink is Script {
-    // Contract addresses
-    address constant VAULT_ADDRESS = 0xaFf8c2337df3A7ce17525E6aa1BABCbb926F1421;
-    address constant LINK_TOKEN = 0x514910771AF9Ca656af840dff83E8264EcF986CA;
+    // Sepolia testnet addresses
+    address constant VAULT_ADDRESS = 0xaFf8c2337df3A7ce17525E6aa1BABCbb926F1421; // Update this after deployment
+    address constant LINK_TOKEN = 0x779877A7B0D9E8603169DdbD7836e478b4624789; // Sepolia LINK Token
     
-    // LINK whale address with lots of tokens (on mainnet)
-    address constant LINK_WHALE = 0x3f5CE5FBFe3E9aF3971dD833D26bA9b5C936f0bE;
+    // LINK whale address on Sepolia (you may need to fund this address first)
+    // Replace with your own funded address or get LINK from the faucet: https://faucets.chain.link/sepolia
+    address constant LINK_WHALE = 0x94d182C5aF3F2Bb8eB1C409Dc000cA8dC393925a; // Update this with your funded address
     
     // Amount of LINK to transfer (18 decimals)
-    uint256 constant LINK_AMOUNT = 10 * 10**18; // 10 LINK
+    uint256 constant AMOUNT = 10 * 10**18; // 10 LINK
     
     function run() external {
         // Get deployer private key from env

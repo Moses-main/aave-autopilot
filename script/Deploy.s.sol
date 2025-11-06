@@ -6,18 +6,18 @@ import "../src/AaveAutopilot.sol";
 
 /**
  * @title AaveAutopilot Deploy Script
- * @notice Script to deploy AaveAutopilot contract to Ethereum Mainnet
+ * @notice Script to deploy AaveAutopilot contract to Ethereum Sepolia Testnet
  * @dev Make sure to set the PRIVATE_KEY environment variable before running
  */
 contract DeployScript is Script {
-    // Ethereum Mainnet addresses as strings to avoid checksum issues
-    string constant USDC_STR = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"; // Mainnet USDC
-    string constant AAVE_POOL_STR = "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2"; // Mainnet Aave Pool
-    string constant AAVE_DATA_PROVIDER_STR = "0x7B4EB56E7CD4b454BA8fF71E4518426369a138a3"; // Mainnet Aave Data Provider
-    string constant A_USDC_STR = "0x98C23E9d8f34FEfb1B7Bd6a91B7bB122F4E16f5c"; // Mainnet aUSDC
-    string constant ETH_USD_PRICE_FEED_STR = "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"; // Mainnet ETH/USD Price Feed
-    string constant LINK_TOKEN_STR = "0x514910771AF9Ca656af840dff83E8264EcF986CA"; // Mainnet LINK Token
-    string constant KEEPER_REGISTRY_STR = "0xE16Df59B403e9B01F5f28a3b09a4e71c9F3509dF"; // Mainnet Chainlink Keeper Registry
+    // Sepolia Testnet addresses as strings to avoid checksum issues
+    string constant USDC_STR = "0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8"; // Sepolia USDC (6 decimals)
+    string constant AAVE_POOL_STR = "0x6Ae43d3271fF6888e7Fc43Fd7321a503fF738951"; // Sepolia Aave Pool
+    string constant AAVE_DATA_PROVIDER_STR = "0x9B2F5546AaE6fC2eE3BEaD55c59eB7eD8648aFe1"; // Sepolia Aave Data Provider
+    string constant A_USDC_STR = "0x16dA4541aD1807f4443d92D26044C1147406EB10"; // Sepolia aUSDC (6 decimals)
+    string constant ETH_USD_PRICE_FEED_STR = "0x694AA1769357215DE4FAC081bf1f309aDC325306"; // Sepolia ETH/USD Price Feed
+    string constant LINK_TOKEN_STR = "0x779877A7B0D9E8603169DdbD7836e478b4624789"; // Sepolia LINK Token
+    string constant KEEPER_REGISTRY_STR = "0xE16Df59B887e3Caa439E0b29B42bA2e7976FD8b2"; // Sepolia Chainlink Keeper Registry 2.1
     
     // Address variables
     address USDC;
@@ -102,8 +102,13 @@ contract DeployScript is Script {
         // Log next steps
         console.log("\n=== Next Steps ===");
         console.log("1. Fund the contract with LINK tokens for Chainlink Automation");
-        console.log("2. Register the contract with Chainlink Keepers");
-        console.log("3. Test the contract on a forked mainnet");
+        console.log("2. Register the contract with Chainlink Keepers on Sepolia");
+        console.log("3. Test the contract using the Sepolia testnet");
+        console.log("\nRun these commands to complete setup:");
+        console.log("\n# 1. Fund with LINK");
+        console.log("forge script script/FundWithLink.s.sol --rpc-url $RPC_URL --broadcast -vvvv");
+        console.log("\n# 2. Register with Chainlink Keepers");
+        console.log("forge script script/RegisterKeeperV2.s.sol --rpc-url $RPC_URL --broadcast -vvvv");
         
         // Emit events for better integration with other tools
         emit ContractDeployed(address(aaveAutopilot), "AaveAutopilot");

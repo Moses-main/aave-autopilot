@@ -1,11 +1,11 @@
-# 🚀 AAVE Autopilot Vault (Tenderly Fork)
+# 🚀 AAVE Autopilot Vault (Sepolia Testnet)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Built with Foundry](https://img.shields.io/badge/Built%20with-Foundry-FFDB1C.svg)](https://getfoundry.sh/)
 [![Test Status](https://github.com/Moses-main/aave-autopilot/actions/workflows/test.yml/badge.svg)](https://github.com/Moses-main/aave-autopilot/actions)
 [![Coverage Status](https://coveralls.io/repos/github/Moses-main/aave-autopilot/badge.svg?branch=main)](https://coveralls.io/github/Moses-main/aave-autopilot?branch=main)
 
-An ERC-4626 vault that automates Aave v3 position management with Chainlink Automation to prevent liquidations. Currently deployed on a Tenderly-forked Ethereum Mainnet for testing.
+An ERC-4626 vault that automates Aave v3 position management with Chainlink Automation to prevent liquidations. Deployed on the Ethereum Sepolia testnet.
 
 ## Features
 
@@ -14,7 +14,7 @@ An ERC-4626 vault that automates Aave v3 position management with Chainlink Auto
 - **Gas Efficient**: Optimized for minimal gas usage on Sepolia
 - **Secure**: Implements OpenZeppelin's security patterns
 - **Fork Testing**: Supports local forked testing on Ethereum Mainnet using Tenderly
-- **Mainnet Deployment**: Pre-configured for Ethereum Mainnet with Tenderly RPC
+- **Testnet Deployment**: Pre-configured for Ethereum Sepolia testnet
 
 ## Architecture
 
@@ -110,46 +110,90 @@ forge test --fork-url $RPC_URL --fork-block-number 20000000 -vvv
 forge coverage --fork-url $SEPOLIA_RPC_URL
 ```
 
+## Testing on Sepolia
+
+To test against the Sepolia testnet:
+
+1. Create a `.env` file with your configuration:
+   ```bash
+   # .env
+   RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_API_KEY
+   PRIVATE_KEY=your_private_key
+   ```
+2. Run the tests:
+   ```bash
+   forge test --fork-url $RPC_URL -vvv
+   ```
+
 ## Deployment
 
-### Deploy to Tenderly Fork
+### Deploy to Sepolia Testnet
 
-1. **Set up your environment**:
+1. **Prerequisites**:
+   - Install [Foundry](https://getfoundry.sh/)
+   - Get Sepolia ETH from a faucet
+   - Get Sepolia LINK from the [Chainlink Faucet](https://faucets.chain.link/sepolia)
+
+2. **Set up environment**:
    ```bash
    # Copy the example environment file
    cp .env.example .env
    
-   # Edit .env with your Tenderly RPC URL and private key
+   # Edit .env with your configuration
    # Required variables:
-   # - RPC_URL: Your Tenderly fork RPC URL
-   # - PRIVATE_KEY: Your deployer private key
+   RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_API_KEY
+   PRIVATE_KEY=your_private_key_with_0x_prefix
    ```
 
-2. **Deploy to Tenderly Fork**:
+3. **Deploy the contract**:
    ```bash
    # Load environment variables
    source .env
    
-   # Deploy the contract
-   forge script script/DeployForked.s.sol \
+   # Deploy to Sepolia
+   forge script script/DeploySepolia.s.sol:DeploySepolia \
      --rpc-url $RPC_URL \
+     --private-key $PRIVATE_KEY \
      --broadcast \
+     --verify \
      -vvvv
    ```
 
-3. **Current Deployment**:
-   - **Contract Address**: `0xaFf8c2337df3A7ce17525E6aa1BABCbb926F1421`
-   - **Network**: Tenderly Forked Mainnet
-   - **Deployment TX**: [View on Tenderly](https://dashboard.tenderly.co/contract/mainnet/0xaFf8c2337df3A7ce17525E6aa1BABCbb926F1421)
+4. **Verify on Etherscan**:
+   The contract will be automatically verified if you include `--verify` and have an Etherscan API key set in your environment.
 
-4. **Verify the deployment**:
+5. **Register with Chainlink Keepers**:
+   After deployment, register your contract with Chainlink Keepers:
    ```bash
-   # Check contract code
-   cast code 0xaFf8c2337df3A7ce17525E6aa1BABCbb926F1421 --rpc-url $RPC_URL
+   # Fund the registry with LINK
+   cast send $LINK_TOKEN \
+     --rpc-url $RPC_URL \
+     --private-key $PRIVATE_KEY \
+     "transfer(address,uint256)" $KEEPER_REGISTRY 5000000000000000000  # 5 LINK
    
-   # Check contract owner
-   cast call 0xaFf8c2337df3A7ce17525E6aa1BABCbb926F1421 "owner()" --rpc-url $RPC_URL
+   # Register the upkeep (replace with your contract address)
+   cast send $KEEPER_REGISTRY \
+     --rpc-url $RPC_URL \
+     --private-key $PRIVATE_KEY \
+     "registerAndPredictID(string,uint32,address,uint32,address,bytes,bytes,uint96,address)" \
+     "AaveAutopilot Keeper" \
+     500000 \
+     $YOUR_CONTRACT_ADDRESS \
+     2500000 \
+     $YOUR_ADDRESS \
+     0x \
+     0x \
+     5000000000000000000 \
+     $YOUR_ADDRESS
    ```
+
+6. **Current Deployment**:
+   - **Contract Address**: `[Will be updated after deployment]`
+   - **Network**: Ethereum Sepolia Testnet (Chain ID: 11155111)
+   - **Explorer**: [View on Sepolia Etherscan](https://sepolia.etherscan.io/)
+   - **Aave V3 Pool**: [0x6Ae43d3...](https://sepolia.etherscan.io/address/0x6Ae43d3271fF6888e7Fc43Fd7321a503fF738951)
+   - **Chainlink Keeper Registry**: [0xE16Df59B...](https://sepolia.etherscan.io/address/0xE16Df59B887e3Caa439E0b29B42bA2e7976FD8b2)
+   - **LINK Token**: [0x779877A7...](https://sepolia.etherscan.io/address/0x779877A7B0D9E8603169DdbD7836e478b4624789)
 
 ## Chainlink Automation Setup
 

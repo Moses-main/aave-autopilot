@@ -6,6 +6,9 @@ import "../src/AaveAutopilot.sol";
 import "../src/interfaces/IAave.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+// This test file uses mocks to test the AaveAutopilot contract
+// For integration tests with Sepolia testnet, see AaveAutopilotSepoliaFork.t.sol
+
 // Mock ERC20 token for testing
 contract MockERC20 is IERC20 {
     string public name = "Mock USDC";

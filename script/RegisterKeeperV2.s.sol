@@ -38,20 +38,24 @@ interface IKeeperRegistry {
 
 /**
  * @title RegisterKeeperV2
- * @notice Script to register AaveAutopilot with Chainlink Automation 2.1
- * @dev Make sure to set the PRIVATE_KEY environment variable before running
+ * @notice Script to register the AaveAutopilot contract with Chainlink Automation 2.1 on Sepolia
+ * @dev Make sure to set the PRIVATE_KEY and RPC_URL environment variables before running
  */
 contract RegisterKeeperV2 is Script {
-    // Contract addresses
+    // Chainlink Keeper Registry 2.1 (Sepolia Testnet)
+    // https://docs.chain.link/chainlink-automation/supported-networks/
+    address constant KEEPER_REGISTRY = 0xE16Df59B887e3Caa439E0b29B42bA2e7976FD8b2;
+    
+    // The AaveAutopilot contract address to register (update after deployment)
     address constant VAULT_ADDRESS = 0xaFf8c2337df3A7ce17525E6aa1BABCbb926F1421;
-    address constant KEEPER_REGISTRY = 0xE16Df59B403e9B01F5f28a3b09a4e71c9F3509dF; // KeeperRegistry 2.1
-    address constant LINK_TOKEN = 0x514910771AF9Ca656af840dff83E8264EcF986CA;
     
-    // Keeper registration parameters
+    // LINK token (Sepolia Testnet)
+    address constant LINK_TOKEN = 0x779877A7B0D9E8603169DdbD7836e478b4624789;
+    
+    // Keeper configuration
     string constant UPKEEP_NAME = "AaveAutopilot Keeper";
-    uint32 constant GAS_LIMIT = 1_000_000; // Adjust based on your contract's needs
-    uint96 constant FUND_AMOUNT = 5 * 10**18; // 5 LINK
-    
+    uint32 constant GAS_LIMIT = 500000; // Adjust based on your needs
+    uint96 constant FUND_AMOUNT = 5 * 10**18; // 5 LINK (18 decimals)   
     function run() external {
         // Get deployer private key from env
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");

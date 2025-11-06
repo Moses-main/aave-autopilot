@@ -12,12 +12,12 @@ import "../src/interfaces/IAave.sol";
  */
 contract DeploySepolia is Script {
     // Sepolia addresses (as strings to avoid checksum issues)
-    string constant USDC_STR = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"; // Sepolia USDC
+    string constant USDC_STR = "0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8"; // Sepolia USDC
     string constant AAVE_POOL_STR = "0x6Ae43d3271fF6888e7Fc43Fd7321a503fF738951"; // Aave V3 Pool
-    string constant AAVE_DATA_PROVIDER_STR = "0x3e9708D80F7b3e431180130bF478987472f950aF"; // Aave Data Provider
-    string constant A_USDC_STR = "0x16dA4541aD1807f4443d92D26044C1147406EB80"; // aUSDC Token
+    string constant AAVE_DATA_PROVIDER_STR = "0x9B2F5546AaE6fC2eE3BEaD55c59eB7eD8648aFe1"; // Aave Data Provider
+    string constant A_USDC_STR = "0x16dA4541aD1807f4443d92D26044C1147406EB10"; // aUSDC Token
     string constant ETH_USD_PRICE_FEED_STR = "0x694AA1769357215DE4FAC081bf1f309aDC325306"; // Chainlink ETH/USD
-    string constant KEEPER_REGISTRY_STR = "0xE16Df59B403e9B01F5f28a3b09a4e71c9F3509dF"; // Chainlink Keeper Registry
+    string constant KEEPER_REGISTRY_STR = "0xE16Df59B887e3Caa439E0b29B42bA2e7976FD8b2"; // Chainlink Keeper Registry 2.1
     string constant LINK_TOKEN_STR = "0x779877A7B0D9E8603169DdbD7836e478b4624789"; // LINK Token on Sepolia
     
     // Address variables
