@@ -1,11 +1,11 @@
-# 🚀 AAVE Autopilot Vault (Ethereum Mainnet)
+# 🚀 AAVE Autopilot Vault (Tenderly Fork)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Built with Foundry](https://img.shields.io/badge/Built%20with-Foundry-FFDB1C.svg)](https://getfoundry.sh/)
 [![Test Status](https://github.com/Moses-main/aave-autopilot/actions/workflows/test.yml/badge.svg)](https://github.com/Moses-main/aave-autopilot/actions)
 [![Coverage Status](https://coveralls.io/repos/github/Moses-main/aave-autopilot/badge.svg?branch=main)](https://coveralls.io/github/Moses-main/aave-autopilot?branch=main)
 
-An ERC-4626 vault that automates Aave v3 position management on Ethereum Mainnet with Chainlink Automation to prevent liquidations. This version is configured for Mainnet deployment using Tenderly for forked testing.
+An ERC-4626 vault that automates Aave v3 position management with Chainlink Automation to prevent liquidations. Currently deployed on a Tenderly-forked Ethereum Mainnet for testing.
 
 ## Features
 
@@ -112,45 +112,115 @@ forge coverage --fork-url $SEPOLIA_RPC_URL
 
 ## Deployment
 
-### Deploy to Sepolia
+### Deploy to Tenderly Fork
 
-1. Start a local Anvil node forked from Sepolia:
+1. **Set up your environment**:
    ```bash
-   anvil --fork-url $FORKED_URL
+   # Copy the example environment file
+   cp .env.example .env
+   
+   # Edit .env with your Tenderly RPC URL and private key
+   # Required variables:
+   # - RPC_URL: Your Tenderly fork RPC URL
+   # - PRIVATE_KEY: Your deployer private key
    ```
 
-2. In a new terminal, deploy to the forked network:
+2. **Deploy to Tenderly Fork**:
    ```bash
+   # Load environment variables
    source .env
-   forge script script/DeployForked.s.sol --rpc-url http://localhost:8545 --broadcast -vvvv --private-key $PRIVATE_KEY
-   ```
-
-### Deployment to Ethereum Sepolia Testnet
-
-1. Deploy to Ethereum Sepolia:
-   ```bash
-   source .env
+   
+   # Deploy the contract
    forge script script/DeployForked.s.sol \
      --rpc-url $RPC_URL \
      --broadcast \
-     --verify \
-     -vvvv \
-     --private-key $PRIVATE_KEY \
-     --etherscan-api-key $ETHERSCAN_API_KEY
+     -vvvv
    ```
 
-2. After deployment, update your `.env` with the deployed contract address:
+3. **Current Deployment**:
+   - **Contract Address**: `0x129918F79fB60dc1AC3f07316f0683f9Fa356178`
+   - **Network**: Tenderly Forked Mainnet
+   - **Deployment TX**: [View on Tenderly](https://dashboard.tenderly.co/contract/mainnet/0x129918F79fB60dc1AC3f07316f0683f9Fa356178)
+
+4. **Verify the deployment**:
    ```bash
-   echo "VAULT_ADDRESS=0xDeployedContractAddress" >> .env
+   # Check contract code
+   cast code 0x129918F79fB60dc1AC3f07316f0683f9Fa356178 --rpc-url $RPC_URL
+   
+   # Check contract owner
+   cast call 0x129918F79fB60dc1AC3f07316f0683f9Fa356178 "owner()" --rpc-url $RPC_URL
    ```
 
 ## Chainlink Automation Setup
 
-After deployment, register your contract with Chainlink Automation:
+### Prerequisites
+- The contract must be deployed and funded with LINK tokens
+- You'll need the contract address and owner private key
 
-1. Fund your contract with LINK tokens for payment
-2. Register the contract with the Chainlink Automation Registry
-3. Set up the appropriate trigger conditions (health factor threshold)
+### 1. Fund the Contract with LINK
+
+```bash
+# Load environment variables
+source .env
+
+# Fund the contract with 10 LINK (18 decimals)
+cast send $LINK_TOKEN \
+  --rpc-url $RPC_URL \
+  --private-key $PRIVATE_KEY \
+  "transfer(address,uint256)" \
+  0x129918F79fB60dc1AC3f07316f0683f9Fa356178 \
+  10000000000000000000  # 10 LINK
+
+# Verify LINK balance
+cast call $LINK_TOKEN \
+  --rpc-url $RPC_URL \
+  "balanceOf(address)" \
+  0x129918F79fB60dc1AC3f07316f0683f9Fa356178
+```
+
+### 2. Register with Chainlink Keepers
+
+```bash
+# Load environment variables
+source .env
+
+# Approve Keeper Registry to spend LINK
+export KEEPER_REGISTRY=0xE16Df59B403e9B01F5f28a3b09a4e71c9F3509dF
+
+cast send $LINK_TOKEN \
+  --rpc-url $RPC_URL \
+  --private-key $PRIVATE_KEY \
+  "approve(address,uint256)" \
+  $KEEPER_REGISTRY \
+  1000000000000000000  # 1 LINK
+
+# Register with Chainlink Keepers
+forge script script/RegisterWithKeepers.s.sol \
+  --rpc-url $RPC_URL \
+  --broadcast \
+  -vvvv
+```
+
+### 3. Verify Keeper Registration
+
+```bash
+# Check if the contract is registered
+cast call $KEEPER_REGISTRY \
+  --rpc-url $RPC_URL \
+  "getUpkeepCount()"
+
+# Check the registered upkeep (replace 0 with your upkeep ID if known)
+cast call $KEEPER_REGISTRY \
+  --rpc-url $RPC_URL \
+  "getUpkeep(uint256)" \
+  0
+```
+
+### 4. Test Keeper Automation
+
+1. Deposit funds to trigger position monitoring
+2. Simulate price movement to test rebalancing
+3. Verify Keeper execution in Tenderly dashboard
 
 Example registration parameters:
 - Name: AaveAutopilot Keeper
