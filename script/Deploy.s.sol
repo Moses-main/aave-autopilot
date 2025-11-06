@@ -48,13 +48,27 @@ contract DeployScript is Script {
             revert("PRIVATE_KEY environment variable not set");
         }
         
-        console.log("Starting deployment of AaveAutopilot...");
+        // Get deployer address
+        address deployer = vm.addr(deployerPrivateKey);
+        
+        // Log deployment configuration
+        console.log("\n=== Deployment Configuration ===");
+        console.log("Deployer:", deployer);
+        console.log("USDC:", USDC);
+        console.log("Aave Pool:", AAVE_POOL);
+        console.log("Aave Data Provider:", AAVE_DATA_PROVIDER);
+        console.log("aUSDC:", A_USDC);
+        console.log("ETH/USD Price Feed:", ETH_USD_PRICE_FEED);
+        console.log("LINK Token:", LINK_TOKEN);
+        console.log("Keeper Registry:", KEEPER_REGISTRY);
+        
+        console.log("\nStarting deployment of AaveAutopilot...");
         
         // Start broadcasting transactions
         vm.startBroadcast(deployerPrivateKey);
         
-        // Deploy the vault
-        AaveAutopilot vault = new AaveAutopilot(
+        // Deploy the AaveAutopilot contract
+        AaveAutopilot aaveAutopilot = new AaveAutopilot(
             IERC20(USDC), // USDC token
             "Aave Autopilot USDC", // Vault name
             "apUSDC", // Vault symbol
@@ -63,32 +77,38 @@ contract DeployScript is Script {
             A_USDC, // aUSDC token
             ETH_USD_PRICE_FEED, // ETH/USD price feed
             LINK_TOKEN, // LINK token for Chainlink Keepers
-            msg.sender // Owner
+            deployer // Owner
         );
         
         // Grant keeper role to the Keeper Registry
-        vault.grantRole(vault.KEEPER_ROLE(), KEEPER_REGISTRY);
+        aaveAutopilot.grantRole(
+            aaveAutopilot.KEEPER_ROLE(),
+            KEEPER_REGISTRY
+        );
         
-        // Log deployment details
-        console.log("\n=== Deployment Summary ===");
-        console.log("Network:", block.chainid);
-        console.log("Deployer:", vm.addr(deployerPrivateKey));
-        console.log("AaveAutopilot deployed to:", address(vault));
+        // Transfer ownership if needed
+        if (aaveAutopilot.owner() != deployer) {
+            aaveAutopilot.transferOwnership(deployer);
+        }
         
-        // Verify critical configurations
-        console.log("\n=== Configuration ===");
-        console.log("USDC Token:", USDC);
-        console.log("Aave Pool:", AAVE_POOL);
-        console.log("Aave Data Provider:", AAVE_DATA_PROVIDER);
-        console.log("aUSDC Token:", A_USDC);
-        console.log("ETH/USD Price Feed:", ETH_USD_PRICE_FEED);
-        console.log("LINK Token:", LINK_TOKEN);
-        console.log("Keeper Registry:", KEEPER_REGISTRY);
-        
-        emit ContractDeployed(address(vault), "AaveAutopilot");
-        
-        // Stop broadcasting
         vm.stopBroadcast();
+        
+        // Log deployment summary
+        console.log("\n=== Deployment Successful ===");
+        console.log("AaveAutopilot deployed to:", address(aaveAutopilot));
+        console.log("Owner:", aaveAutopilot.owner());
+        console.log("Chain ID:", block.chainid);
+        
+        // Log next steps
+        console.log("\n=== Next Steps ===");
+        console.log("1. Fund the contract with LINK tokens for Chainlink Automation");
+        console.log("2. Register the contract with Chainlink Keepers");
+        console.log("3. Test the contract on a forked mainnet");
+        
+        // Emit events for better integration with other tools
+        emit ContractDeployed(address(aaveAutopilot), "AaveAutopilot");
+        emit ConfigurationSet(address(aaveAutopilot), "KEEPER_REGISTRY", KEEPER_REGISTRY);
+        emit ConfigurationSet(address(aaveAutopilot), "LINK_TOKEN", LINK_TOKEN);
         
         console.log("\nDeployment completed successfully!");
     }
