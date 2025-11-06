@@ -63,12 +63,9 @@ contract AaveAutopilot is
     
     /// @notice Aave aToken for the underlying asset
     IAToken public immutable aToken;
-    
+
     /// @notice Chainlink token address
     address public immutable LINK_TOKEN;
-    
-    /// @notice Track last rebalance timestamp per user
-    mapping(address => uint256) public lastRebalanceTimestamp;
     
     /// @notice Minimum time between rebalances (1 hour)
     uint256 public constant REBALANCE_COOLDOWN = 1 hours;
@@ -234,13 +231,13 @@ contract AaveAutopilot is
 
             // ============ Chainlink Automation ============
     
-    // Constants for batch processing and circuit breaker
+    // State variables for batch processing and circuit breaker
     uint256 public currentBatchIndex;
+    uint256 private lastCheckedIndex;
+    mapping(address => uint256) public rebalanceAttempts;
+    mapping(address => uint256) public lastRebalanceTimestamp;
     uint256 public constant MAX_REBALANCE_ATTEMPTS = 3;
     uint256 public constant BATCH_SIZE = 10; // Number of users to process in one batch
-    
-    // Track rebalance attempts per user
-    mapping(address => uint256) public rebalanceAttempts;
     
     /**
      * @notice Internal function to get a batch of users with active positions
@@ -260,7 +257,7 @@ contract AaveAutopilot is
      */
     function checkUpkeep(
         bytes calldata checkData
-    ) external view override returns (bool upkeepNeeded, bytes memory performData) {
+    ) external override returns (bool upkeepNeeded, bytes memory performData) {
         // If specific user is provided in checkData, check only that user
         if (checkData.length > 0) {
             address user = abi.decode(checkData, (address));
@@ -280,7 +277,7 @@ contract AaveAutopilot is
         }
         
         // In production, implement batch processing of users
-        // For demo, we'll use a simplified approach with currentBatchIndex
+        // For demo, we'll use a simplified approach with lastCheckedIndex
         address[] memory usersToCheck = new address[](1);
         address currentUser = msg.sender; // Replace with actual batch processing
         usersToCheck[0] = currentUser;
@@ -292,6 +289,9 @@ contract AaveAutopilot is
                                    currentHf > 0 && 
                                    rebalanceAttempts[currentUser] < MAX_REBALANCE_ATTEMPTS &&
                                    currentTimePassed;
+        
+        // Update the last checked index
+        lastCheckedIndex = (lastCheckedIndex + 1) % 10;
         
         return (currentNeedsRebalance, abi.encode(usersToCheck));
     }

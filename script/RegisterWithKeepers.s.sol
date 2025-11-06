@@ -12,7 +12,7 @@ import {IKeeperRegistry} from "../src/interfaces/IKeeperRegistry.sol";
  */
 contract RegisterWithKeepers is Script {
     // Contract addresses
-    address constant VAULT_ADDRESS = 0xc9497Ec40951FbB98C02c666b7F9Fa143678E2Be;
+    address constant VAULT_ADDRESS = 0x9F50a6a0464C590d6ED48AEc36690Efd3752F5E1;
     address constant KEEPER_REGISTRY = 0x7b3EC232b08BD7b4b3305BE0C044D907B2DF960B; // Legacy Keeper Registry
     address constant LINK_TOKEN = 0x514910771AF9Ca656af840dff83E8264EcF986CA;
     
