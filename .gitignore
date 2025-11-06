@@ -10,8 +10,9 @@ out/
 # Docs
 docs/
 
-# Script
-*script
-
 # Dotenv file
 .env
+
+# Allow deployment scripts
+!script/Deploy*.s.sol
+!script/CheckDeployed.s.sol
