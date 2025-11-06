@@ -138,17 +138,17 @@ forge coverage --fork-url $SEPOLIA_RPC_URL
    ```
 
 3. **Current Deployment**:
-   - **Contract Address**: `0x129918F79fB60dc1AC3f07316f0683f9Fa356178`
+   - **Contract Address**: `0xc9497Ec40951FbB98C02c666b7F9Fa143678E2Be`
    - **Network**: Tenderly Forked Mainnet
-   - **Deployment TX**: [View on Tenderly](https://dashboard.tenderly.co/contract/mainnet/0x129918F79fB60dc1AC3f07316f0683f9Fa356178)
+   - **Deployment TX**: [View on Tenderly](https://dashboard.tenderly.co/contract/mainnet/0xc9497Ec40951FbB98C02c666b7F9Fa143678E2Be)
 
 4. **Verify the deployment**:
    ```bash
    # Check contract code
-   cast code 0x129918F79fB60dc1AC3f07316f0683f9Fa356178 --rpc-url $RPC_URL
+   cast code 0xc9497Ec40951FbB98C02c666b7F9Fa143678E2Be --rpc-url $RPC_URL
    
    # Check contract owner
-   cast call 0x129918F79fB60dc1AC3f07316f0683f9Fa356178 "owner()" --rpc-url $RPC_URL
+   cast call 0xc9497Ec40951FbB98C02c666b7F9Fa143678E2Be "owner()" --rpc-url $RPC_URL
    ```
 
 ## Chainlink Automation Setup
@@ -168,14 +168,14 @@ cast send $LINK_TOKEN \
   --rpc-url $RPC_URL \
   --private-key $PRIVATE_KEY \
   "transfer(address,uint256)" \
-  0x129918F79fB60dc1AC3f07316f0683f9Fa356178 \
+  0xc9497Ec40951FbB98C02c666b7F9Fa143678E2Be \
   10000000000000000000  # 10 LINK
 
 # Verify LINK balance
 cast call $LINK_TOKEN \
   --rpc-url $RPC_URL \
   "balanceOf(address)" \
-  0x129918F79fB60dc1AC3f07316f0683f9Fa356178
+  0xc9497Ec40951FbB98C02c666b7F9Fa143678E2Be
 ```
 
 ### 2. Register with Chainlink Keepers
@@ -273,7 +273,7 @@ The AAVE Autopilot Vault provides a simple interface for users to deposit USDC, 
 
 ### Current Stage: Beta (Tenderly Fork)
 
-- **Deployed Contract Address (Tenderly Fork)**: [`0x129918F79fB60dc1AC3f07316f0683f9Fa356178`](https://dashboard.tenderly.co/contract/mainnet/0x129918F79fB60dc1AC3f07316f0683f9Fa356178)
+- **Deployed Contract Address (Tenderly Fork)**: [`0xc9497Ec40951FbB98C02c666b7F9Fa143678E2Be`](https://dashboard.tenderly.co/contract/mainnet/0xc9497Ec40951FbB98C02c666b7F9Fa143678E2Be)
 - **Test Coverage**: 85%+
 - **Audit Status**: Pending
 - **Mainnet Readiness**: Under Review

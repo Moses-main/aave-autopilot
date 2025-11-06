@@ -11,7 +11,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  */
 contract FundWithLink is Script {
     // Contract addresses
-    address constant VAULT_ADDRESS = 0x129918F79fB60dc1AC3f07316f0683f9Fa356178;
+    address constant VAULT_ADDRESS = 0xc9497Ec40951FbB98C02c666b7F9Fa143678E2Be;
     address constant LINK_TOKEN = 0x514910771AF9Ca656af840dff83E8264EcF986CA;
     
     // LINK whale address with lots of tokens (on mainnet)
