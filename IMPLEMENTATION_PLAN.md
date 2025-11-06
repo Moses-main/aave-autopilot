@@ -23,16 +23,18 @@
 ## Phase 3: Deployment & Verification (Mainnet)
 - [x] Create deployment scripts
 - [x] Update deployment scripts with LINK token support
-- [ ] Deploy to Ethereum Mainnet
-- [ ] Verify contracts on Etherscan
-- [ ] Set up Chainlink Keepers
-- [ ] Test end-to-end on Mainnet
+- [x] Deploy to Tenderly Mainnet Fork
+- [ ] Verify contract functionality on fork
+- [x] Set up Chainlink Keepers on fork
+- [ ] Test end-to-end on Mainnet fork
+- [ ] Deploy to Ethereum Mainnet (when ready)
 
 ### Recent Changes (2025-11-06):
-- Updated deployment scripts to properly handle LINK token integration
-- Added comprehensive logging and error handling to deployment scripts
-- Ensured proper access control for Keeper Registry
-- Added deployment verification steps
+- Successfully deployed to Tenderly Mainnet Fork
+- Updated documentation with Tenderly deployment details
+- Added comprehensive testing scripts for fork environment
+- Set up Chainlink Keeper registration process
+- Added detailed verification steps for fork testing
 
 ## Phase 4: Documentation & Finalization
 - [x] Update README with Mainnet deployment instructions
@@ -40,16 +42,26 @@
 - [ ] Create deployment checklists
 - [ ] Document known limitations
 
-## Current Focus: Mainnet Deployment
-We are preparing for deployment to Ethereum Mainnet using Tenderly for forked testing and verification. The contract has been updated with LINK token support and gas optimizations.
+## Current Focus: Tenderly Fork Testing
+We are currently testing the contract on a Tenderly-forked Mainnet environment. This allows us to verify all functionality in a production-like setting before proceeding with Mainnet deployment.
 
 ## Next Steps
-1. Update deployment scripts to include LINK token address
-2. Test deployment on Tenderly fork
-3. Deploy contracts to Ethereum Mainnet
-4. Verify contracts on Etherscan
-5. Set up Chainlink Keepers with proper LINK token funding
-6. Perform end-to-end testing on Mainnet fork
+1. Test contract functionality on Tenderly fork:
+   - [ ] Test deposit/withdraw functionality
+   - [ ] Test rebalancing logic
+   - [ ] Verify Keeper automation
+   - [ ] Test edge cases and failure modes
+
+2. Complete end-to-end testing:
+   - [ ] Simulate price movements
+   - [ ] Test liquidation scenarios
+   - [ ] Verify Keeper execution
+   - [ ] Monitor gas usage
+
+3. Prepare for Mainnet deployment:
+   - [ ] Finalize deployment parameters
+   - [ ] Prepare verification scripts
+   - [ ] Document deployment process
 
 ## Important Notes
 - The deployment scripts need to be updated to include the LINK token address in the constructor
