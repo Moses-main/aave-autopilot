@@ -276,24 +276,13 @@ contract AaveAutopilot is
             }
         }
         
-        // In production, implement batch processing of users
-        // For demo, we'll use a simplified approach with lastCheckedIndex
-        address[] memory usersToCheck = new address[](1);
-        address currentUser = msg.sender; // Replace with actual batch processing
-        usersToCheck[0] = currentUser;
+        // For the purpose of this demo, we'll return false when checkData is empty
+        // In a production environment, you would implement batch processing of users here
+        // and return the appropriate list of users that need rebalancing
         
-        uint256 currentHf = _getHealthFactorView(currentUser);
-        uint256 currentUserLastRebalance = lastRebalanceTimestamp[currentUser];
-        bool currentTimePassed = block.timestamp - currentUserLastRebalance >= REBALANCE_COOLDOWN;
-        bool currentNeedsRebalance = currentHf < AaveLib.KEEPER_THRESHOLD && 
-                                   currentHf > 0 && 
-                                   rebalanceAttempts[currentUser] < MAX_REBALANCE_ATTEMPTS &&
-                                   currentTimePassed;
-        
-        // Update the last checked index
-        lastCheckedIndex = (lastCheckedIndex + 1) % 10;
-        
-        return (currentNeedsRebalance, abi.encode(usersToCheck));
+        // Return empty arrays to indicate no upkeep is needed
+        address[] memory emptyUsers = new address[](0);
+        return (false, abi.encode(emptyUsers));
     }
     
     /**

@@ -11,7 +11,7 @@ import {AaveAutopilot} from "../src/AaveAutopilot.sol";
  */
 contract TestVault is Script {
     // Contract addresses
-    address constant VAULT_ADDRESS = 0x9F50a6a0464C590d6ED48AEc36690Efd3752F5E1;
+    address constant VAULT_ADDRESS = 0xaFf8c2337df3A7ce17525E6aa1BABCbb926F1421;
     address constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
     address constant USDC_WHALE = 0x47ac0Fb4F2D84898e4D9E7b4DaB3C24507a6D503;
     

@@ -138,17 +138,17 @@ forge coverage --fork-url $SEPOLIA_RPC_URL
    ```
 
 3. **Current Deployment**:
-   - **Contract Address**: `0x9F50a6a0464C590d6ED48AEc36690Efd3752F5E1`
+   - **Contract Address**: `0xaFf8c2337df3A7ce17525E6aa1BABCbb926F1421`
    - **Network**: Tenderly Forked Mainnet
-   - **Deployment TX**: [View on Tenderly](https://dashboard.tenderly.co/contract/mainnet/0x9F50a6a0464C590d6ED48AEc36690Efd3752F5E1)
+   - **Deployment TX**: [View on Tenderly](https://dashboard.tenderly.co/contract/mainnet/0xaFf8c2337df3A7ce17525E6aa1BABCbb926F1421)
 
 4. **Verify the deployment**:
    ```bash
    # Check contract code
-   cast code 0x9F50a6a0464C590d6ED48AEc36690Efd3752F5E1 --rpc-url $RPC_URL
+   cast code 0xaFf8c2337df3A7ce17525E6aa1BABCbb926F1421 --rpc-url $RPC_URL
    
    # Check contract owner
-   cast call 0x9F50a6a0464C590d6ED48AEc36690Efd3752F5E1 "owner()" --rpc-url $RPC_URL
+   cast call 0xaFf8c2337df3A7ce17525E6aa1BABCbb926F1421 "owner()" --rpc-url $RPC_URL
    ```
 
 ## Chainlink Automation Setup
@@ -168,14 +168,14 @@ cast send $LINK_TOKEN \
   --rpc-url $RPC_URL \
   --private-key $PRIVATE_KEY \
   "transfer(address,uint256)" \
-  0x9F50a6a0464C590d6ED48AEc36690Efd3752F5E1 \
+  0xaFf8c2337df3A7ce17525E6aa1BABCbb926F1421 \
   10000000000000000000  # 10 LINK
 
 # Verify LINK balance
 cast call $LINK_TOKEN \
   --rpc-url $RPC_URL \
   "balanceOf(address)" \
-  0x9F50a6a0464C590d6ED48AEc36690Efd3752F5E1
+  0xcDe14d966e546D70F9B0b646c203cFC1BdC2a961
 ```
 
 ### 2. Register with Chainlink Keepers
@@ -273,7 +273,7 @@ The AAVE Autopilot Vault provides a simple interface for users to deposit USDC, 
 
 ### Current Stage: Beta (Tenderly Fork)
 
-- **Deployed Contract Address (Tenderly Fork)**: [`0x9F50a6a0464C590d6ED48AEc36690Efd3752F5E1`](https://dashboard.tenderly.co/contract/mainnet/0x9F50a6a0464C590d6ED48AEc36690Efd3752F5E1)
+- **Deployed Contract Address (Tenderly Fork)**: [`0xaFf8c2337df3A7ce17525E6aa1BABCbb926F1421`](https://dashboard.tenderly.co/contract/mainnet/0xaFf8c2337df3A7ce17525E6aa1BABCbb926F1421)
 - **Test Coverage**: 85%+
 - **Audit Status**: Pending
 - **Mainnet Readiness**: Under Review

@@ -20,8 +20,8 @@ interface IKeeperRegistry {
 
 contract SimpleRegister is Script {
     function run() external {
-        // Contract addresses
-        address VAULT_ADDRESS = 0x9F50a6a0464C590d6ED48AEc36690Efd3752F5E1;
+        // Contract addresses - Update these with your deployed contract addresses
+        address VAULT_ADDRESS = 0xcDe14d966e546D70F9B0b646c203cFC1BdC2a961;
         address KEEPER_REGISTRY = 0x7b3EC232b08BD7b4b3305BE0C044D907B2DF960B;
         address LINK_TOKEN = 0x514910771AF9Ca656af840dff83E8264EcF986CA;
         
