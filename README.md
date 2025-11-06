@@ -188,12 +188,15 @@ To test against the Sepolia testnet:
    ```
 
 6. **Current Deployment**:
-   - **Contract Address**: `[Will be updated after deployment]`
+   - **Contract Address**: [0xA076ecA49434a4475a9FF716c2E9f20ccc453c20](https://sepolia.etherscan.io/address/0xA076ecA49434a4475a9FF716c2E9f20ccc453c20)
    - **Network**: Ethereum Sepolia Testnet (Chain ID: 11155111)
-   - **Explorer**: [View on Sepolia Etherscan](https://sepolia.etherscan.io/)
+   - **Explorer**: [View on Sepolia Etherscan](https://sepolia.etherscan.io/address/0xA076ecA49434a4475a9FF716c2E9f20ccc453c20)
    - **Aave V3 Pool**: [0x6Ae43d3...](https://sepolia.etherscan.io/address/0x6Ae43d3271fF6888e7Fc43Fd7321a503fF738951)
    - **Chainlink Keeper Registry**: [0xE16Df59B...](https://sepolia.etherscan.io/address/0xE16Df59B887e3Caa439E0b29B42bA2e7976FD8b2)
    - **LINK Token**: [0x779877A7...](https://sepolia.etherscan.io/address/0x779877A7B0D9E8603169DdbD7836e478b4624789)
+   - **USDC Token**: [0x94a9D9AC...](https://sepolia.etherscan.io/address/0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8)
+   - **aUSDC Token**: [0x16dA4541...](https://sepolia.etherscan.io/address/0x16dA4541aD1807f4443d92D26044C1147406EB10)
+   - **Deployment TX**: [View on Etherscan](https://sepolia.etherscan.io/address/0xA076ecA49434a4475a9FF716c2E9f20ccc453c20)
 
 ## Chainlink Automation Setup
 
