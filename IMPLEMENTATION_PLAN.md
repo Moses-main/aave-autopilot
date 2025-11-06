@@ -1,4 +1,4 @@
-# Aave Autopilot - Implementation Plan (Mainnet)
+# Aave Autopilot - Implementation Plan (Sepolia Testnet)
 
 ## Phase 1: Core Contract Implementation ✅
 - [x] Set up project structure with Foundry
@@ -20,48 +20,49 @@
 - [x] Fix checksum issues in test files
 - [x] Update test environment to use USDC whale for testing
 
-## Phase 3: Deployment & Verification (Mainnet)
+## Phase 3: Deployment & Verification (Sepolia Testnet)
 - [x] Create deployment scripts
 - [x] Update deployment scripts with LINK token support
-- [x] Deploy to Tenderly Mainnet Fork
-- [ ] Verify contract functionality on fork
-- [x] Set up Chainlink Keepers on fork
-- [ ] Test end-to-end on Mainnet fork
-- [ ] Deploy to Ethereum Mainnet (when ready)
+- [x] Deploy to Sepolia Testnet
+- [x] Verify contract on Etherscan
+- [x] Set up Chainlink Keepers on Sepolia
+- [x] Test end-to-end on Sepolia
+- [x] Register with Chainlink Automation
+- [ ] Monitor automation performance
 
 ### Recent Changes (2025-11-06):
-- Successfully deployed to Tenderly Mainnet Fork
-- Updated documentation with Tenderly deployment details
-- Added comprehensive testing scripts for fork environment
-- Set up Chainlink Keeper registration process
-- Added detailed verification steps for fork testing
+- Successfully deployed to Sepolia Testnet
+- Contract verified on Etherscan: [0xA076ecA49434a4475a9FF716c2E9f20ccc453c20](https://sepolia.etherscan.io/address/0xA076ecA49434a4475a9FF716c2E9f20ccc453c20)
+- Successfully registered with Chainlink Automation
+- Updated documentation with Sepolia deployment details
+- Cleaned up project files and removed unused scripts
 
 ## Phase 4: Documentation & Finalization
-- [x] Update README with Mainnet deployment instructions
-- [ ] Add NatSpec comments
-- [ ] Create deployment checklists
-- [ ] Document known limitations
+- [x] Update README with Sepolia deployment instructions
+- [x] Add comprehensive test coverage
+- [x] Document deployment process
+- [x] Document known limitations
+- [x] Clean up project files
 
-## Current Focus: Tenderly Fork Testing
-We are currently testing the contract on a Tenderly-forked Mainnet environment. This allows us to verify all functionality in a production-like setting before proceeding with Mainnet deployment.
+## Current Status: Live on Sepolia Testnet
+The contract is now live on Sepolia Testnet and registered with Chainlink Automation. The system is actively monitoring positions and will automatically rebalance when needed.
 
 ## Next Steps
-1. Test contract functionality on Tenderly fork:
-   - [ ] Test deposit/withdraw functionality
-   - [ ] Test rebalancing logic
-   - [ ] Verify Keeper automation
-   - [ ] Test edge cases and failure modes
-
-2. Complete end-to-end testing:
-   - [ ] Simulate price movements
-   - [ ] Test liquidation scenarios
-   - [ ] Verify Keeper execution
+1. Monitor Automation:
+   - [ ] Verify Keeper executions
    - [ ] Monitor gas usage
+   - [ ] Track performance metrics
 
-3. Prepare for Mainnet deployment:
+2. Test Vault Operations:
+   - [x] Test deposit functionality
+   - [x] Test withdrawal functionality
+   - [ ] Test rebalancing under different market conditions
+   - [ ] Monitor health factor changes
+
+3. Prepare for Mainnet:
+   - [ ] Review gas optimizations
    - [ ] Finalize deployment parameters
-   - [ ] Prepare verification scripts
-   - [ ] Document deployment process
+   - [ ] Prepare security audit
 
 ## Important Notes
 - The deployment scripts need to be updated to include the LINK token address in the constructor
@@ -70,38 +71,41 @@ We are currently testing the contract on a Tenderly-forked Mainnet environment. 
 
 ## Testing Commands
 ```bash
-# Run all tests with Mainnet forking
+# Run all tests
+forge test -vvv
+
+# Run forked tests against Sepolia
 forge test -vvv --fork-url $RPC_URL
 
-# Run specific test file with forking
-forge test --match-path test/AaveAutopilotMainnetFork.t.sol -vvv --fork-url $RPC_URL
+# Run specific test file
+forge test --match-path test/AaveAutopilotMainnetFork.t.sol -vvv
 
-# Run with specific block number for consistency
-forge test -vvv --fork-url $RPC_URL --fork-block-number 20000000
+# Run with gas report
+forge test --gas-report
 ```
 
 ## Environment Variables
-Update your `.env` file with Mainnet configuration:
+Update your `.env` file with Sepolia configuration:
 ```bash
-# Tenderly RPC URL for Mainnet forking
-RPC_URL=https://virtual.mainnet.eu.rpc.tenderly.co/82c86106-662e-4d7f-a974-c311987358ff
+# Sepolia RPC URL
+RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_API_KEY
 
-# Mainnet Addresses
-USDC=0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
-AAVE_POOL=0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2
-AAVE_DATA_PROVIDER=0x7B4EB56E7CD4b454BA8fF71E4518426369a138a3
-A_USDC=0x98C23E9d8f34FEFb1B7BD6a91B7BB122F4e16F5c
-ETH_USD_PRICE_FEED=0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419
-KEEPER_REGISTRY=0xE16Df59B403e9B01F5f28a3b09a4e71c9F3509dF
-LINK_TOKEN=0x514910771AF9Ca656af840dff83E8264EcF986CA
+# Sepolia Addresses
+USDC=0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8
+AAVE_POOL=0x6Ae43d3271fF6888e7Fc43Fd7321a503fF738951
+AAVE_DATA_PROVIDER=0x9B2F5546AaE6FC2eE3BEaD55c59eB7eD8648aFe1
+A_USDC=0x16dA4541aD1807f4443d92D26044C1147406EB10
+ETH_USD_PRICE_FEED=0x694AA1769357215DE4FAC081bf1f309aDC325306
+KEEPER_REGISTRY=0xE16Df59B887e3Caa439E0b29B42bA2e7976FD8b2
+LINK_TOKEN=0x779877A7B0D9E8603169DdbD7836e478b4624789
 
 # Deployment
 PRIVATE_KEY=your_private_key_here
 ETHERSCAN_API_KEY=your_etherscan_api_key_here
 
-# Testing Accounts (for forked testing)
-USDC_WHALE=0x47ac0Fb4F2D84898e4D9E7b4DaB3C24507a6D503  # USDC whale for testing
+# Contract Addresses
+AAVE_AUTOPILOT=0xA076ecA49434a4475a9FF716c2E9f20ccc453c20
 ```
 
 ## Last Updated
-2025-11-06 - Updated for Mainnet deployment with Tenderly RPC
+2025-11-06 - Successfully deployed to Sepolia Testnet and registered with Chainlink Automation

@@ -13,8 +13,8 @@ An ERC-4626 vault that automates Aave v3 position management with Chainlink Auto
 - **Chainlink Automation**: Uses Chainlink Keepers for automated rebalancing
 - **Gas Efficient**: Optimized for minimal gas usage on Sepolia
 - **Secure**: Implements OpenZeppelin's security patterns
-- **Fork Testing**: Supports local forked testing on Ethereum Mainnet using Tenderly
-- **Testnet Deployment**: Pre-configured for Ethereum Sepolia testnet
+- **Testnet Deployment**: Successfully deployed to Ethereum Sepolia testnet
+- **Verified Contract**: [View on Etherscan](https://sepolia.etherscan.io/address/0xA076ecA49434a4475a9FF716c2E9f20ccc453c20)
 
 ## Architecture
 
@@ -628,49 +628,125 @@ Based on current AAVE v3 rates and historical performance:
 - [ ] Advanced risk management
 - [ ] Institutional features
 
-## 🛠 Development
+## 🚀 Quick Start
 
-### Build
+### Interact with Deployed Contract
 
-```bash
-forge build
-```
+1. **Approve USDC for Deposit** (if using Sepolia USDC):
+   ```bash
+   cast send 0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8 \
+     "approve(address,uint256)" \
+     0xA076ecA49434a4475a9FF716c2E9f20ccc453c20 \
+     1000000 \
+     --private-key $PRIVATE_KEY \
+     --rpc-url $RPC_URL
+   ```
 
-### Test
+2. **Deposit USDC**:
+   ```bash
+   cast send 0xA076ecA49434a4475a9FF716c2E9f20ccc453c20 \
+     "deposit(uint256,address)" \
+     1000000 \
+     0xYourWalletAddress \
+     --private-key $PRIVATE_KEY \
+     --rpc-url $RPC_URL
+   ```
 
-```bash
-# Run all tests
-forge test -vvv
+3. **Check Your Balance**:
+   ```bash
+   cast call 0xA076ecA49434a4475a9FF716c2E9f20ccc453c20 \
+     "balanceOf(address)(uint256)" \
+     0xYourWalletAddress \
+     --rpc-url $RPC_URL
+   ```
 
-# Run tests with gas reporting
-forge test --gas-report
+4. **Withdraw USDC**:
+   ```bash
+   cast send 0xA076ecA49434a4475a9FF716c2E9f20ccc453c20 \
+     "withdraw(uint256,address,address)" \
+     500000 \
+     0xYourWalletAddress \
+     0xYourWalletAddress \
+     --private-key $PRIVATE_KEY \
+     --rpc-url $RPC_URL
+   ```
 
-# Run specific test
-forge test --match-test testDeposit -vvv
-```
+## Monitoring
 
-### Deploy
+### Check Contract State
 
-```bash
-# Deploy to Sepolia ETH
-forge script script/Deploy.s.sol:DeployScript \
-  --rpc-url $RPC_URL \
-  --private-key $PRIVATE_KEY \
-  --broadcast \
-  --verify \
-  -vvvv
-```
+1. **Check Total Assets**:
+   ```bash
+   cast call 0xA076ecA49434a4475a9FF716c2E9f20ccc453c20 \
+     "totalAssets()(uint256)" \
+     --rpc-url $RPC_URL
+   ```
 
-## 📄 License
+2. **Check Health Factor**:
+   ```bash
+   cast call 0xA076ecA49434a4475a9FF716c2E9f20ccc453c20 \
+     "getHealthFactor()(uint256)" \
+     --rpc-url $RPC_URL
+   ```
+
+3. **Check Keeper Status**:
+   ```bash
+   # Check if checkUpkeep returns true
+   cast call 0xA076ecA49434a4475a9FF716c2E9f20ccc453c20 \
+     "checkUpkeep(bytes)(bool,bytes)" \
+     0x \
+     --rpc-url $RPC_URL
+   ```
+
+### View Events
+
+1. **Deposit Events**:
+   ```bash
+   cast logs --from-block 0 --to latest \
+     --address 0xA076ecA49434a4475a9FF716c2E9f20ccc453c20 \
+     --topic 0xdcbc1c05240f31ff3ad067ef1ee35ce4997762752e3a095284754544f4c709d7 \
+     --rpc-url $RPC_URL
+   ```
+
+2. **Withdraw Events**:
+   ```bash
+   cast logs --from-block 0 --to latest \
+     --address 0xA076ecA49434a4475a9FF716c2E9f20ccc453c20 \
+     --topic 0x5b8f46461c1dd69fb968f1a003acee221ea3e19540e350233b612ddb43433b55 \
+     --rpc-url $RPC_URL
+   ```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Insufficient Gas**:
+   - Ensure you have enough Sepolia ETH for gas fees
+   - Get test ETH from a Sepolia faucet
+
+2. **Transaction Reverted**:
+   - Check the error message in the transaction receipt
+   - Verify token approvals and balances
+   - Ensure you're using the correct contract addresses
+
+3. **Keeper Not Triggering**:
+   - Check if the contract has enough LINK
+   - Verify the upkeep is registered on [Chainlink Keepers App](https://automation.chain.link/sepolia)
+   - Ensure `checkUpkeep` returns `true`
+
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Support
+
+For support or questions, please open an issue on [GitHub](https://github.com/Moses-main/aave-autopilot/issues).
 
 ## 🙏 Acknowledgements
 
 - [AAVE](https://aave.com/) team for the amazing lending protocol
 - [Chainlink](https://chain.link/) for price feeds and keepers
 - [OpenZeppelin](https://openzeppelin.com/) for battle-tested contracts
-- All contributors and testers
 ```
 
 ### Test
