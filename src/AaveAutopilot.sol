@@ -51,6 +51,12 @@ contract AaveAutopilot is
 
     /// @notice Health factor threshold for Keeper check (1.1x)
     uint256 public constant KEEPER_THRESHOLD = 1.1e18;
+    
+    /// @notice Gas buffer for keeper operations (100k gas)
+    uint256 public constant GAS_BUFFER = 100000;
+    
+    /// @notice Safety margin for health factor (1.02 = 2%)
+    uint256 public safetyMargin = 1.02e18;
 
     /// @notice Chainlink ETH/USD price feed
     AggregatorV3Interface public immutable ethUsdPriceFeed;
@@ -63,6 +69,9 @@ contract AaveAutopilot is
     
     /// @notice Aave aToken for the underlying asset
     IAToken public immutable aToken;
+    
+    /// @notice Chainlink token address
+    address public immutable LINK_TOKEN;
     
     /// @notice Track last rebalance timestamp per user
     mapping(address => uint256) public lastRebalanceTimestamp;
@@ -84,10 +93,35 @@ contract AaveAutopilot is
         string reason
     );
     event MaxAttemptsReached(address indexed user);
+    event GasLimitReached(address indexed lastProcessedUser, uint256 processedCount);
+    event SafetyMarginUpdated(uint256 oldMargin, uint256 newMargin);
     
     // ERC4626 Events
     event Deposited(address indexed sender, address indexed owner, uint256 assets, uint256 shares);
     event Withdrawn(address indexed sender, address indexed receiver, address indexed owner, uint256 assets, uint256 shares);
+    
+    /**
+     * @notice Set the safety margin for health factor checks
+     * @param _safetyMargin New safety margin (1e18 = 100%, 1.02e18 = 102%, etc.)
+     */
+    function setSafetyMargin(uint256 _safetyMargin) external onlyOwner {
+        require(_safetyMargin >= 1e18, "Margin too low");
+        require(_safetyMargin <= 1.1e18, "Margin too high");
+        emit SafetyMarginUpdated(safetyMargin, _safetyMargin);
+        safetyMargin = _safetyMargin;
+    }
+    
+    /**
+     * @notice Withdraw any LINK tokens from the contract
+     * @param to Address to send the LINK tokens to
+     */
+    function withdrawLink(address to) external onlyOwner {
+        require(to != address(0), "Invalid address");
+        IERC20 link = IERC20(LINK_TOKEN);
+        uint256 balance = link.balanceOf(address(this));
+        require(balance > 0, "No LINK to withdraw");
+        link.safeTransfer(to, balance);
+    }
 
     // ============ Constructor ============
 
@@ -99,6 +133,7 @@ contract AaveAutopilot is
      * @param _aaveDataProvider The Aave v3 data provider address
      * @param _aToken The Aave v3 aToken address
      * @param _ethUsdPriceFeed Chainlink ETH/USD price feed address
+     * @param _linkToken Chainlink token address
      * @param _owner Owner of the contract
      */
     constructor(
@@ -109,6 +144,7 @@ contract AaveAutopilot is
         address _aaveDataProvider,
         address _aToken,
         address _ethUsdPriceFeed,
+        address _linkToken,
         address _owner
     ) ERC4626(_asset) ERC20(_name, _symbol) {
         require(_aavePool != address(0), "Invalid Aave Pool");
@@ -130,6 +166,7 @@ contract AaveAutopilot is
         aaveDataProvider = IPoolDataProvider(_aaveDataProvider);
         aToken = IAToken(_aToken);
         ethUsdPriceFeed = AggregatorV3Interface(_ethUsdPriceFeed);
+        LINK_TOKEN = _linkToken;
         
         // Approve Aave Pool to spend our tokens
         IERC20(asset()).safeIncreaseAllowance(_aavePool, type(uint256).max);

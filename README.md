@@ -1,11 +1,11 @@
-# 🚀 AAVE Autopilot Vault (Sepolia)
+# 🚀 AAVE Autopilot Vault (Ethereum Mainnet)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Built with Foundry](https://img.shields.io/badge/Built%20with-Foundry-FFDB1C.svg)](https://getfoundry.sh/)
 [![Test Status](https://github.com/Moses-main/aave-autopilot/actions/workflows/test.yml/badge.svg)](https://github.com/Moses-main/aave-autopilot/actions)
 [![Coverage Status](https://coveralls.io/repos/github/Moses-main/aave-autopilot/badge.svg?branch=main)](https://coveralls.io/github/Moses-main/aave-autopilot?branch=main)
 
-An ERC-4626 vault that automates Aave v3 position management on Sepolia with Chainlink Automation to prevent liquidations.
+An ERC-4626 vault that automates Aave v3 position management on Ethereum Mainnet with Chainlink Automation to prevent liquidations. This version is configured for Mainnet deployment using Tenderly for forked testing.
 
 ## Features
 
@@ -13,8 +13,8 @@ An ERC-4626 vault that automates Aave v3 position management on Sepolia with Cha
 - **Chainlink Automation**: Uses Chainlink Keepers for automated rebalancing
 - **Gas Efficient**: Optimized for minimal gas usage on Sepolia
 - **Secure**: Implements OpenZeppelin's security patterns
-- **Fork Testing**: Supports local forked testing on Ethereum Sepolia
-- **Sepolia Deployment**: Pre-configured for Ethereum Sepolia testnet
+- **Fork Testing**: Supports local forked testing on Ethereum Mainnet using Tenderly
+- **Mainnet Deployment**: Pre-configured for Ethereum Mainnet with Tenderly RPC
 
 ## Architecture
 
@@ -40,8 +40,8 @@ An ERC-4626 vault that automates Aave v3 position management on Sepolia with Cha
 - [Foundry](https://book.getfoundry.sh/getting-started/installation)
 - [jq](https://stedolan.github.io/jq/download/) (for deployment scripts)
 - [Git](https://git-scm.com/)
-- [Sepolia ETH](https://sepoliafaucet.com/)
-- [Sepolia LINK](https://faucets.chain.link/sepolia)
+- [Ethereum Mainnet ETH](https://ethereum.org/en/get-eth/)
+- [LINK token](https://chain.link/chainlink-vrf) (for Chainlink Keepers)
 
 ### Installation
 
@@ -62,25 +62,31 @@ An ERC-4626 vault that automates Aave v3 position management on Sepolia with Cha
    # Edit .env with your private key and API keys
    ```
 
-2. Install dependencies:
+4. Install dependencies:
    ```bash
    forge install
    ```
 
-3. Set up environment variables:
-   Create a `.env` file in the root directory with the following content:
+5. Configure your `.env` file with Mainnet settings:
    ```bash
-   # Network RPC URLs
-   # RPC Configuration
-   FORKED_URL=https://soft-distinguished-uranium.ethereum-sepolia.quiknode.pro/e28e07caa3efb8c50dc2a28854dd53578f91626c/
-   RPC_URL=https://eth-sepolia.g.alchemy.com/v2/your-api-key
+   # Tenderly RPC URL for Mainnet forking
+   RPC_URL=https://virtual.mainnet.eu.rpc.tenderly.co/82c86106-662e-4d7f-a974-c311987358ff
+   
+   # Mainnet Addresses (Ethereum)
+   USDC=0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48  # USDC contract
+   AAVE_POOL=0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2  # Aave V3 Pool
+   AAVE_DATA_PROVIDER=0x7B4EB56E7CD4b454BA8fF71E4518426369a138a3  # Aave Data Provider
+   A_USDC=0x98C23E9d8f34FEFb1B7BD6a91B7BB122F4e16F5c  # aUSDC Token
+   ETH_USD_PRICE_FEED=0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419  # Chainlink ETH/USD
+   KEEPER_REGISTRY=0xE16Df59B403e9B01F5f28a3b09a4e71c9F3509dF  # Chainlink Keeper Registry
+   LINK_TOKEN=0x514910771AF9Ca656af840dff83E8264EcF986CA  # LINK Token
    
    # Deployment
    PRIVATE_KEY=your_private_key_here
-   ETHERSCAN_API_KEY=your_etherscan_api_key
+   ETHERSCAN_API_KEY=your_etherscan_api_key_here
    
-   # Contract addresses (Ethereum Sepolia)
-   VAULT_ADDRESS=0xaE2202566bE5325e2A5746b66E13F0D6f7E248b6
+   # Testing Accounts (for forked testing)
+   USDC_WHALE=0x47ac0Fb4F2D84898e4D9E7b4DaB3C24507a6D503  # USDC whale for testing
    ```
 
 ## Testing
@@ -94,8 +100,11 @@ forge test
 # Run tests with gas report
 forge test --gas-report
 
-# Run forked tests against Sepolia
-forge test --fork-url $SEPOLIA_RPC_URL -vvv
+# Run forked tests against Mainnet
+forge test --fork-url $RPC_URL -vvv
+
+# Run with specific block number for consistency
+forge test --fork-url $RPC_URL --fork-block-number 20000000 -vvv
 
 # Run with coverage report
 forge coverage --fork-url $SEPOLIA_RPC_URL
@@ -324,10 +333,39 @@ forge script script/Deploy.s.sol:DeployScript \
 
 ## 🔍 Verification
 
-The contract is already verified on Etherscan:
-- [AaveAutopilot on Etherscan](https://sepolia.etherscan.io/address/0xaE2202566bE5325e2A5746b66E13F0D6f7E248b6#code)
+## Deployment
 
-To verify the contract manually, use:
+### Deploy to Mainnet
+
+1. Ensure your `.env` file is properly configured with Mainnet settings
+2. Run the deployment script:
+   ```bash
+   forge script script/Deploy.s.sol --rpc-url $RPC_URL --broadcast --verify -vvvv
+   ```
+
+### Verify on Etherscan
+
+After deployment, verify your contract on Etherscan using the following command:
+
+```bash
+forge verify-contract \
+  --chain-id 1 \
+  --num-of-optimizations 200 \
+  --watch \
+  --constructor-args $(cast abi-encode "constructor(address,string,string,address,address,address,address,address)" \
+    0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48 \
+    "Aave Autopilot Vault" \
+    "aAuto-USDC" \
+    0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2 \
+    0x7B4EB56E7CD4b454BA8fF71E4518426369a138a3 \
+    0x98C23E9d8f34FEFb1B7BD6a91B7BB122F4e16F5c \
+    0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419 \
+    0xE16Df59B403e9B01F5f28a3b09a4e71c9F3509dF) \
+  --compiler-version v0.8.20+commit.a1b79de6 \
+  --etherscan-api-key $ETHERSCAN_API_KEY \
+  <YOUR_DEPLOYED_CONTRACT_ADDRESS> \
+  src/AaveAutopilot.sol:AaveAutopilot
+```
 
 ```bash
 forge verify-contract \

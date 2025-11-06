@@ -112,6 +112,7 @@ contract AaveAutopilotTest is Test {
 
     AaveAutopilot public vault;
     MockERC20 public usdc;
+    MockERC20 public linkToken;
     MockAggregatorV3 public ethUsdPriceFeed;
     
     // Test addresses
@@ -139,6 +140,7 @@ contract AaveAutopilotTest is Test {
         
         // Deploy mock contracts
         usdc = new MockERC20();
+        linkToken = new MockERC20();
         ethUsdPriceFeed = new MockAggregatorV3(2000e8); // $2000/ETH
         
         // Deploy mock Aave contracts
@@ -155,8 +157,12 @@ contract AaveAutopilotTest is Test {
             address(mockAaveDataProvider),
             address(mockAToken),
             address(ethUsdPriceFeed),
+            address(linkToken),
             keeper
         );
+        
+        // Mint some LINK to the vault for testing
+        linkToken.mint(address(vault), 10e18);
         
         // Set up initial balances
         usdc.mint(owner, 10000e6);
