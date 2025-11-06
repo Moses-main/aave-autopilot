@@ -65,6 +65,7 @@ contract DeploySepolia is Script {
             AAVE_DATA_PROVIDER, // Aave Data Provider
             A_USDC, // aUSDC Token
             ETH_USD_PRICE_FEED, // ETH/USD Price Feed
+            LINK_TOKEN, // LINK Token for Chainlink Keepers
             deployer // Use the deployer address as the owner
         );
         

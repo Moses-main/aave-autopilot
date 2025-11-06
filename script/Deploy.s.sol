@@ -6,22 +6,42 @@ import "../src/AaveAutopilot.sol";
 
 /**
  * @title AaveAutopilot Deploy Script
- * @notice Script to deploy AaveAutopilot contract to Base Sepolia
+ * @notice Script to deploy AaveAutopilot contract to Ethereum Mainnet
  * @dev Make sure to set the PRIVATE_KEY environment variable before running
  */
 contract DeployScript is Script {
-    // Ethereum Sepolia addresses
-    address constant USDC = 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238; // Sepolia USDC
-    address constant AAVE_POOL = 0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951; // Sepolia Aave Pool
-    address constant AAVE_DATA_PROVIDER = 0x3e9708D80F7b3e431180130bF478987472f950aF; // Sepolia Aave Data Provider (checksummed)
-    address constant A_USDC = 0x16dA4541aD1807f4443d92D26044C1147406EB80; // Sepolia aUSDC
-    address constant ETH_USD_PRICE_FEED = 0x694AA1769357215DE4FAC081bf1f309aDC325306; // Sepolia ETH/USD Price Feed
+    // Ethereum Mainnet addresses as strings to avoid checksum issues
+    string constant USDC_STR = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"; // Mainnet USDC
+    string constant AAVE_POOL_STR = "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2"; // Mainnet Aave Pool
+    string constant AAVE_DATA_PROVIDER_STR = "0x7B4EB56E7CD4b454BA8fF71E4518426369a138a3"; // Mainnet Aave Data Provider
+    string constant A_USDC_STR = "0x98C23E9d8f34FEfb1B7Bd6a91B7bB122F4E16f5c"; // Mainnet aUSDC
+    string constant ETH_USD_PRICE_FEED_STR = "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"; // Mainnet ETH/USD Price Feed
+    string constant LINK_TOKEN_STR = "0x514910771AF9Ca656af840dff83E8264EcF986CA"; // Mainnet LINK Token
+    string constant KEEPER_REGISTRY_STR = "0xE16Df59B403e9B01F5f28a3b09a4e71c9F3509dF"; // Mainnet Chainlink Keeper Registry
+    
+    // Address variables
+    address USDC;
+    address AAVE_POOL;
+    address AAVE_DATA_PROVIDER;
+    address A_USDC;
+    address ETH_USD_PRICE_FEED;
+    address LINK_TOKEN;
+    address KEEPER_REGISTRY;
     
     // Events for better logging
     event ContractDeployed(address indexed contractAddress, string contractName);
     event ConfigurationSet(address indexed contractAddress, string config, address value);
     
     function run() external {
+        // Parse all addresses from strings
+        USDC = vm.parseAddress(USDC_STR);
+        AAVE_POOL = vm.parseAddress(AAVE_POOL_STR);
+        AAVE_DATA_PROVIDER = vm.parseAddress(AAVE_DATA_PROVIDER_STR);
+        A_USDC = vm.parseAddress(A_USDC_STR);
+        ETH_USD_PRICE_FEED = vm.parseAddress(ETH_USD_PRICE_FEED_STR);
+        LINK_TOKEN = vm.parseAddress(LINK_TOKEN_STR);
+        KEEPER_REGISTRY = vm.parseAddress(KEEPER_REGISTRY_STR);
+        
         // Get deployer private key from env
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         if (deployerPrivateKey == 0) {
@@ -42,8 +62,12 @@ contract DeployScript is Script {
             AAVE_DATA_PROVIDER, // Aave Data Provider
             A_USDC, // aUSDC token
             ETH_USD_PRICE_FEED, // ETH/USD price feed
+            LINK_TOKEN, // LINK token for Chainlink Keepers
             msg.sender // Owner
         );
+        
+        // Grant keeper role to the Keeper Registry
+        vault.grantRole(vault.KEEPER_ROLE(), KEEPER_REGISTRY);
         
         // Log deployment details
         console.log("\n=== Deployment Summary ===");
@@ -58,6 +82,8 @@ contract DeployScript is Script {
         console.log("Aave Data Provider:", AAVE_DATA_PROVIDER);
         console.log("aUSDC Token:", A_USDC);
         console.log("ETH/USD Price Feed:", ETH_USD_PRICE_FEED);
+        console.log("LINK Token:", LINK_TOKEN);
+        console.log("Keeper Registry:", KEEPER_REGISTRY);
         
         emit ContractDeployed(address(vault), "AaveAutopilot");
         
@@ -69,16 +95,39 @@ contract DeployScript is Script {
     
     /**
      * @notice Verify contract deployment on Etherscan
+     * @dev To use this function, run:
+     * forge verify-contract --constructor-args $(cast abi-encode "constructor(address,string,string,address,address,address,address,address,address)" \
+     *   0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48 \
+     *   "Aave Autopilot USDC" \
+     *   "apUSDC" \
+     *   0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2 \
+     *   0x7B4EB56E7CD4b454BA8fF71E4518426369a138a3 \
+     *   0x98C23E9d8f34FEFb1B7BD6a91B7BB122F4e16F5c \
+     *   0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419 \
+     *   0x514910771AF9Ca656af840dff83E8264EcF986CA \
+     *   $YOUR_DEPLOYER_ADDRESS) \
+     *   --verifier etherscan \
+     *   --etherscan-api-key $ETHERSCAN_API_KEY \
+     *   $CONTRACT_ADDRESS \
+     *   src/AaveAutopilot.sol:AaveAutopilot
      */
-    function verifyContract() external pure {
-        string[] memory verifyParams = new string[](5);
-        verifyParams[0] = "verify:verify";
-        verifyParams[1] = "--network";
-        verifyParams[2] = "base-sepolia";
-        verifyParams[3] = "--constructor-args";
-        verifyParams[4] = "script/arguments.js";
-        
-        // This would be called with: forge verify-contract --constructor-args script/arguments.js --verifier etherscan --etherscan-api-key $ETHERSCAN_API_KEY $CONTRACT_ADDRESS src/AaveAutopilot.sol:AaveAutopilot
-        // Note: You'll need to create script/arguments.js with the constructor arguments
+    function verifyContract() external pure {}
+    
+    /**
+     * @notice Helper function to get the encoded constructor arguments
+     * @dev This can be used to generate the constructor arguments for verification
+     */
+    function getConstructorArgs() external view returns (bytes memory) {
+        return abi.encode(
+            USDC,
+            "Aave Autopilot USDC",
+            "apUSDC",
+            AAVE_POOL,
+            AAVE_DATA_PROVIDER,
+            A_USDC,
+            ETH_USD_PRICE_FEED,
+            LINK_TOKEN,
+            msg.sender
+        );
     }
 }

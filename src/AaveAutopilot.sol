@@ -11,6 +11,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/IAave.sol";
 import "./interfaces/AggregatorV3Interface.sol";
 import "./interfaces/KeeperCompatibleInterface.sol";
+import "./libraries/AaveLib.sol";
 
 /**
  * @title AaveAutopilot
@@ -42,18 +43,11 @@ contract AaveAutopilot is
     bytes32 public constant KEEPER_ROLE = keccak256("KEEPER_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     // ============ State Variables ============
-
-    /// @notice Minimum health factor before triggering auto-adjustment (1.05x)
-    uint256 public constant MIN_HEALTH_FACTOR = 1.05e18;
-
-    /// @notice Target health factor after rebalancing (1.5x)
-    uint256 public constant TARGET_HEALTH_FACTOR = 1.5e18;
-
-    /// @notice Health factor threshold for Keeper check (1.1x)
-    uint256 public constant KEEPER_THRESHOLD = 1.1e18;
     
+    using AaveLib for IPoolDataProvider;
+
     /// @notice Gas buffer for keeper operations (100k gas)
-    uint256 public constant GAS_BUFFER = 100000;
+    uint256 public constant GAS_BUFFER = 100_000;
     
     /// @notice Safety margin for health factor (1.02 = 2%)
     uint256 public safetyMargin = 1.02e18;
@@ -228,7 +222,7 @@ contract AaveAutopilot is
         
         // Check health factor after withdrawal
         uint256 healthFactor = getCurrentHealthFactor();
-        require(healthFactor >= MIN_HEALTH_FACTOR, "Withdrawal would make position unsafe");
+        require(healthFactor >= AaveLib.MIN_HEALTH_FACTOR, "Withdrawal would make position unsafe");
         
         // Withdraw from Aave
         aavePool.withdraw(asset(), assets, address(this));
@@ -273,7 +267,7 @@ contract AaveAutopilot is
             uint256 userHf = _getHealthFactorView(user);
             uint256 userLastRebalance = lastRebalanceTimestamp[user];
             bool userTimePassed = block.timestamp - userLastRebalance >= REBALANCE_COOLDOWN;
-            bool userNeedsRebalance = userHf < KEEPER_THRESHOLD && 
+            bool userNeedsRebalance = userHf < AaveLib.KEEPER_THRESHOLD && 
                                     userHf > 0 && 
                                     rebalanceAttempts[user] < MAX_REBALANCE_ATTEMPTS &&
                                     userTimePassed;
@@ -294,7 +288,7 @@ contract AaveAutopilot is
         uint256 currentHf = _getHealthFactorView(currentUser);
         uint256 currentUserLastRebalance = lastRebalanceTimestamp[currentUser];
         bool currentTimePassed = block.timestamp - currentUserLastRebalance >= REBALANCE_COOLDOWN;
-        bool currentNeedsRebalance = currentHf < KEEPER_THRESHOLD && 
+        bool currentNeedsRebalance = currentHf < AaveLib.KEEPER_THRESHOLD && 
                                    currentHf > 0 && 
                                    rebalanceAttempts[currentUser] < MAX_REBALANCE_ATTEMPTS &&
                                    currentTimePassed;
@@ -316,7 +310,7 @@ contract AaveAutopilot is
             uint256 oldHealthFactor = getHealthFactor(user);
             
             // Skip if user doesn't need rebalancing or has exceeded max attempts
-            if (oldHealthFactor >= KEEPER_THRESHOLD || 
+            if (oldHealthFactor >= AaveLib.KEEPER_THRESHOLD || 
                 oldHealthFactor == 0 || 
                 rebalanceAttempts[user] >= MAX_REBALANCE_ATTEMPTS) {
                 continue;
@@ -357,7 +351,7 @@ contract AaveAutopilot is
      * @return healthFactor The current health factor (scaled by 1e18)
      */
     function getCurrentHealthFactor() public view returns (uint256 healthFactor) {
-        (, , , , , healthFactor) = aaveDataProvider.getUserAccountData(address(this));
+        ( , , , , , healthFactor) = aaveDataProvider.getUserAccountData(address(this));
         return healthFactor;
     }
     
@@ -367,14 +361,7 @@ contract AaveAutopilot is
      * @return The health factor (scaled by 1e18, >1 means safe, <1 means at risk)
      */
     function _getHealthFactorView(address user) internal view returns (uint256) {
-        if (user == address(0)) return 0;
-        
-        // Get user account data from Aave
-        (
-            , , , , ,
-            uint256 healthFactor
-        ) = aaveDataProvider.getUserAccountData(user);
-        
+        ( , , , , , uint256 healthFactor) = aaveDataProvider.getUserAccountData(user);
         return healthFactor;
     }
     
@@ -410,29 +397,13 @@ contract AaveAutopilot is
         return healthFactor;
     }
     
-    /**
-     * @notice Get the current ETH price in USD from Chainlink
-     * @return price The current ETH price (scaled to 8 decimals)
-     */
-    function getEthPrice() public view returns (uint256) {
-        (
-            , 
-            int256 price,
-            ,
-            ,
-            
-        ) = ethUsdPriceFeed.latestRoundData();
-        require(price > 0, "Invalid price feed");
-        return uint256(price);
-    }
-    
     
     /**
      * @notice Check and adjust the position's health factor
      */
     function checkAndAdjustPosition() external whenNotPaused {
         uint256 healthFactor = getCurrentHealthFactor();
-        if (healthFactor < MIN_HEALTH_FACTOR) {
+        if (healthFactor < AaveLib.MIN_HEALTH_FACTOR) {
             this._rebalancePosition(msg.sender);
         }
     }
@@ -446,46 +417,18 @@ contract AaveAutopilot is
         require(msg.sender == address(this), "Only callable internally");
         
         uint256 currentHf = _getHealthFactorView(user);
-        require(currentHf < MIN_HEALTH_FACTOR, "Health factor is safe");
+        require(currentHf < AaveLib.MIN_HEALTH_FACTOR, "Health factor is safe");
         
-        // Get current debt and collateral from Aave
-        (uint256 totalCollateralETH, uint256 totalDebtETH, , , , ) = aaveDataProvider.getUserAccountData(address(this));
+        // Call the library function to handle the rebalancing
+        uint256 newHealthFactor = AaveLib.rebalancePosition(
+            aavePool,
+            aaveDataProvider,
+            asset(),
+            ethUsdPriceFeed,
+            address(this)
+        );
         
-        // Calculate how much to repay to reach target health factor
-        uint256 ethPrice = getEthPrice();
-        uint256 targetDebt = (totalDebtETH * currentHf) / TARGET_HEALTH_FACTOR;
-        uint256 repayAmountETH = totalDebtETH - targetDebt;
-        
-        if (repayAmountETH > 0) {
-            // Convert ETH amount to asset amount (adjust decimals as needed)
-            uint256 repayAmount = (repayAmountETH * 1e8) / ethPrice;
-            
-            // Check if we have enough liquidity to repay
-            uint256 availableLiquidity = IERC20(asset()).balanceOf(address(this));
-            
-            if (repayAmount > availableLiquidity) {
-                // Calculate how much we can safely withdraw
-                uint256 maxWithdraw = totalCollateralETH - (totalDebtETH * 1e18) / MIN_HEALTH_FACTOR;
-                uint256 needed = repayAmount - availableLiquidity;
-                uint256 withdrawAmount = needed > maxWithdraw ? maxWithdraw : needed;
-                
-                if (withdrawAmount > 0) {
-                    // Withdraw from Aave
-                    aavePool.withdraw(asset(), withdrawAmount, address(this));
-                }
-                
-                // Update available liquidity after withdrawal
-                availableLiquidity = IERC20(asset()).balanceOf(address(this));
-            }
-            
-            // Repay debt with available liquidity (don't try to repay more than we have)
-            uint256 actualRepayAmount = repayAmount > availableLiquidity ? availableLiquidity : repayAmount;
-            if (actualRepayAmount > 0) {
-                aavePool.repay(asset(), actualRepayAmount, 2, address(this));
-            }
-        }
-        
-        emit PositionAdjusted(currentHf, getCurrentHealthFactor());
+        emit PositionAdjusted(currentHf, newHealthFactor);
     }
     
     // ============ Admin Functions ============
