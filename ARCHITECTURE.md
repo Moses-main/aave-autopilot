@@ -2,20 +2,46 @@
 
 ## System Overview
 
+```mermaid
+graph TB
+    %% User Layer
+    User[User] -->|1. Deposit/Withdraw| Vault[AaveAutopilot<br><small>ERC-4626 Vault</small>]
+    
+    %% Core Components
+    subgraph AaveAutopilot[Aave Autopilot System]
+        Vault -->|2. Manage Assets| AaveV3[Aave V3 Protocol]
+        Vault -->|3. Monitor Position| HealthCheck[Health Monitor]
+        Vault -->|4. Track Prices| Oracle[Price Oracle]
+        HealthCheck -->|5. Trigger| Rebalancer[Rebalancer]
+        Rebalancer -->|6. Adjust Position| Vault
+    end
+
+    %% External Services
+    subgraph External[External Services]
+        Chainlink[Chainlink Keepers]
+        AaveV3
+        PriceFeed[Chainlink Price Feeds]
+    end
+
+    %% Data Flows
+    Vault <-->|7. Supply/Redeem| AaveV3
+    Vault <-->|8. Get Prices| PriceFeed
+    Chainlink -->|9. Check Health| HealthCheck
+    Chainlink -->|10. Trigger Rebalance| Rebalancer
+
+    %% Styling
+    classDef userNode fill:#e1f5fe,stroke:#0288d1,color:#000,stroke-width:2px;
+    classDef vaultNode fill:#e8f5e9,stroke:#388e3c,color:#000,stroke-width:2px;
+    classDef externalNode fill:#f3e5f5,stroke:#8e24aa,color:#000,stroke-width:2px;
+    classDef component fill:#fff,stroke:#555,stroke-width:1.5px,stroke-dasharray: 3 3;
+    
+    class User userNode;
+    class Vault vaultNode;
+    class AaveV3,Chainlink,PriceFeed externalNode;
+    class AaveAutopilot,External component;
 ```
-┌─────────────┐    ┌───────────────────┐    ┌─────────────┐
-│             │    │                   │    │             │
-│   User      │───▶│  AaveAutopilot    │◀──▶│  Aave V3    │
-│             │    │  (ERC-4626 Vault) │    │  Protocol   │
-└─────────────┘    └────────┬──────────┘    └─────────────┘
-                           │
-                           ▼
-                   ┌───────────────────┐    ┌─────────────┐
-                   │                   │    │             │
-                   │  Chainlink        │◀──▶│  Price      │
-                   │  Keepers          │    │  Feeds      │
-                   └───────────────────┘    └─────────────┘
-```
+
+*Figure 1: High-level system architecture and data flow*
 
 ## Key Components
 
@@ -42,21 +68,52 @@
 
 ## Data Flow
 
-1. **Deposit Flow**
-   - User deposits USDC into the vault
-   - Vault supplies USDC to Aave V3
-   - User receives vault shares
-   - Position health is monitored
+### 1. Deposit Flow
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant V as AaveAutopilot
+    participant A as Aave V3
+    
+    U->>V: deposit(assets, receiver)
+    V->>A: supply(asset, amount, onBehalfOf, referralCode)
+    A-->>V: aToken minted
+    V-->>U: shares minted
+    Note over V: Update user balance and total supply
+```
 
-2. **Withdrawal Flow**
-   - User redeems vault shares
-   - Vault withdraws USDC from Aave V3 if needed
-   - User receives USDC
+### 2. Withdrawal Flow
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant V as AaveAutopilot
+    participant A as Aave V3
+    
+    U->>V: redeem(shares, receiver, owner)
+    V->>A: withdraw(asset, amount, to)
+    A-->>V: aToken burned
+    V-->>U: assets transferred
+    Note over V: Update user balance and total supply
+```
 
-3. **Rebalancing Flow**
-   - Chainlink Keeper detects health factor below threshold
-   - Keeper triggers rebalance function
-   - Vault adjusts position to maintain target health factor
+### 3. Rebalancing Flow
+```mermaid
+sequenceDiagram
+    participant K as Chainlink Keeper
+    participant V as AaveAutopilot
+    participant A as Aave V3
+    participant O as Price Feed
+    
+    K->>V: checkUpkeep()
+    V->>O: latestRoundData()
+    O-->>V: price
+    V->>V: calculateHealthFactor()
+    alt Health Factor < Threshold
+        K->>V: performUpkeep()
+        V->>A: withdraw() or supply()
+        V->>V: updatePosition()
+    end
+```
 
 ## Security Considerations
 
