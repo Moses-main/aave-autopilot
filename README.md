@@ -1,27 +1,23 @@
-# 🚀 AAVE Autopilot Vault (Sepolia Testnet)
+# 🚀 Aave Autopilot Vault
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Built with Foundry](https://img.shields.io/badge/Built%20with-Foundry-FFDB1C.svg)](https://getfoundry.sh/)
-[![Test Status](https://github.com/Moses-main/aave-autopilot/actions/workflows/test.yml/badge.svg)](https://github.com/Moses-main/aave-autopilot/actions)
-[![Coverage Status](https://coveralls.io/repos/github/Moses-main/aave-autopilot/badge.svg?branch=main)](https://coveralls.io/github/Moses-main/aave-autopilot?branch=main)
 
-An ERC-4626 vault that automates Aave v3 position management with Chainlink Automation to prevent liquidations. Deployed on the Ethereum Sepolia testnet.
+> **Current Status**: In Development
+> - **Network**: Base Sepolia Testnet (Chain ID: 84532)
+> - **Status**: Core Implementation Complete
+> - **Last Updated**: 2025-11-08
 
-> **Current Status**: Successfully deployed and verified on Sepolia Testnet
-> - **Contract Address**: [`0xA076ecA49434a4475a9FF716c2E9f20ccc453c20`](https://sepolia.etherscan.io/address/0xA076ecA49434a4475a9FF716c2E9f20ccc453c20)
-> - **Network**: Ethereum Sepolia Testnet (Chain ID: 11155111)
-> - **Status**: Active with Chainlink Automation
-> - **Last Updated**: 2025-11-06
+An ERC-4626 vault that automates Aave v3 position management with Chainlink Automation to prevent liquidations. Currently under active development for the Base Sepolia testnet.
 
 ## ✨ Features
 
-- **Automated Health Factor Management**: Monitors and maintains healthy positions on Aave v3 (Sepolia)
-- **Chainlink Automation**: Uses Chainlink Keepers for automated rebalancing
-- **Gas Efficient**: Optimized for minimal gas usage on Sepolia
+- **Automated Health Factor Management**: Monitors and maintains healthy positions on Aave v3
+- **Chainlink Automation**: Ready for Chainlink Keepers integration
+- **Gas Efficient**: Optimized for minimal gas usage
 - **Secure**: Implements OpenZeppelin's security patterns
-- **Fully Tested**: Comprehensive test suite with >90% coverage
-- **Fork Testing**: Supports local forked testing against Sepolia
-- **CI/CD**: GitHub Actions for automated testing and deployment
+- **Testing**: Basic test suite in place (needs expansion)
+- **Frontend**: Basic UI implementation available
 
 ## 🏗️ Architecture
 
@@ -72,7 +68,7 @@ An ERC-4626 vault that automates Aave v3 position management with Chainlink Auto
                    └───────────────────┘
 ```
 
-## Setup
+## 🚀 Quickstart
 
 ### Prerequisites
 
@@ -95,9 +91,15 @@ An ERC-4626 vault that automates Aave v3 position management with Chainlink Auto
    curl -L https://foundry.paradigm.xyz | bash
    foundryup
    
-   # Mainnet Addresses (Ethereum)
-   USDC=0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48  # USDC contract
-   AAVE_POOL=0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2  # Aave V3 Pool
+   # Install project dependencies
+   forge install
+   ```
+
+3. **Set up environment variables**:
+   ```bash
+   cp .env.example .env
+   # Update .env with your private keys and API keys
+   ```
    AAVE_DATA_PROVIDER=0x7B4EB56E7CD4b454BA8fF71E4518426369a138a3  # Aave Data Provider
    A_USDC=0x98C23E9d8f34FEFb1B7BD6a91B7BB122F4e16F5c  # aUSDC Token
    ETH_USD_PRICE_FEED=0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419  # Chainlink ETH/USD
