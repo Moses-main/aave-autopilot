@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "./interfaces/IAave.sol";
-import "./interfaces/AggregatorV3Interface.sol";
-import "./interfaces/KeeperCompatibleInterface.sol";
-import "./libraries/AaveLib.sol";
+import {ERC4626WithName} from "./ERC4626WithName.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IPool, IPoolDataProvider, IAToken} from "./interfaces/IAave.sol";
+import {AggregatorV3Interface} from "./interfaces/AggregatorV3Interface.sol";
+import {KeeperCompatibleInterface} from "./interfaces/KeeperCompatibleInterface.sol";
+import {AaveLib} from "./libraries/AaveLib.sol";
 
 /**
  * @title AaveAutopilot
@@ -19,12 +20,12 @@ import "./libraries/AaveLib.sol";
  * @dev Implements intelligent position management to prevent liquidations
  */
 contract AaveAutopilot is 
-    ERC4626, 
+    ERC4626WithName, 
     Ownable, 
+    AccessControl, 
     ReentrancyGuard, 
     Pausable, 
-    AccessControl, 
-    KeeperCompatibleInterface 
+    KeeperCompatibleInterface
 {
     using SafeERC20 for IERC20;
     
@@ -53,16 +54,16 @@ contract AaveAutopilot is
     uint256 public safetyMargin = 1.02e18;
 
     /// @notice Chainlink ETH/USD price feed
-    AggregatorV3Interface public immutable ethUsdPriceFeed;
+    AggregatorV3Interface public immutable ETH_USD_PRICE_FEED;
 
     /// @notice Aave Pool contract
-    IPool public immutable aavePool;
+    IPool public immutable AAVE_POOL;
     
     /// @notice Aave Data Provider contract
-    IPoolDataProvider public immutable aaveDataProvider;
+    IPoolDataProvider public immutable AAVE_DATA_PROVIDER;
     
     /// @notice Aave aToken for the underlying asset
-    IAToken public immutable aToken;
+    IAToken public immutable A_TOKEN;
 
     /// @notice Chainlink token address
     address public immutable LINK_TOKEN;
@@ -124,40 +125,32 @@ contract AaveAutopilot is
      * @param _aaveDataProvider The Aave v3 data provider address
      * @param _aToken The Aave v3 aToken address
      * @param _ethUsdPriceFeed Chainlink ETH/USD price feed address
-     * @param _linkToken Chainlink token address
-     * @param _owner Owner of the contract
+     * @param _linkToken Address of the LINK token
      */
     constructor(
-        IERC20 _asset,
+        IERC20Metadata _asset,
         string memory _name,
         string memory _symbol,
         address _aavePool,
         address _aaveDataProvider,
         address _aToken,
         address _ethUsdPriceFeed,
-        address _linkToken,
-        address _owner
-    ) ERC4626(_asset) ERC20(_name, _symbol) {
-        require(_aavePool != address(0), "Invalid Aave Pool");
-        require(_aaveDataProvider != address(0), "Invalid Data Provider");
-        require(_aToken != address(0), "Invalid aToken");
-        require(_ethUsdPriceFeed != address(0), "Invalid Price Feed");
-        require(_owner != address(0), "Invalid owner address");
+        address _linkToken
+    ) ERC4626WithName(_asset, _name, _symbol) {
+        require(_aavePool != address(0), "Invalid Aave Pool address");
+        require(_aaveDataProvider != address(0), "Invalid Aave Data Provider address");
+        require(_aToken != address(0), "Invalid aToken address");
+        require(_ethUsdPriceFeed != address(0), "Invalid price feed address");
+        require(_linkToken != address(0), "Invalid LINK token address");
         
-        // Initialize Ownable with the owner
-        _transferOwnership(_owner);
-        
-        // Set up roles
-        _setupRole(DEFAULT_ADMIN_ROLE, _owner);
-        _setupRole(PAUSER_ROLE, _owner);
-        _setupRole(KEEPER_ROLE, _owner);
-        
-        // Initialize contract state
-        aavePool = IPool(_aavePool);
-        aaveDataProvider = IPoolDataProvider(_aaveDataProvider);
-        aToken = IAToken(_aToken);
-        ethUsdPriceFeed = AggregatorV3Interface(_ethUsdPriceFeed);
+        AAVE_POOL = IPool(_aavePool);
+        AAVE_DATA_PROVIDER = IPoolDataProvider(_aaveDataProvider);
+        A_TOKEN = IAToken(_aToken);
+        ETH_USD_PRICE_FEED = AggregatorV3Interface(_ethUsdPriceFeed);
         LINK_TOKEN = _linkToken;
+        
+        // Set up default admin role
+        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         
         // Approve Aave Pool to spend our tokens
         IERC20(asset()).safeIncreaseAllowance(_aavePool, type(uint256).max);
@@ -220,7 +213,7 @@ contract AaveAutopilot is
      */
     // Update totalAssets to get real balance from Aave
     function totalAssets() public view override returns (uint256) {
-        return aToken.balanceOf(address(this)); // Real-time balance with interest
+        return A_TOKEN.balanceOf(address(this)); // Real-time balance with interest
     }
 
     /**
@@ -266,7 +259,7 @@ contract AaveAutopilot is
         SafeERC20.safeTransferFrom(token, params.caller, address(this), params.assets);
         
         // Supply to Aave
-        aavePool.supply(asset(), params.assets, address(this), 0);
+        AAVE_POOL.supply(asset(), params.assets, address(this), 0);
         
         // Mint shares to receiver
         _mint(params.receiver, params.shares);
@@ -321,7 +314,7 @@ contract AaveAutopilot is
      */
     function _executeWithdraw(WithdrawParams memory params) internal {
         // Withdraw from Aave
-        aavePool.withdraw(asset(), params.assets, address(this));
+        AAVE_POOL.withdraw(asset(), params.assets, address(this));
         
         // Call parent contract's _withdraw
         super._withdraw(params.caller, params.receiver, params.owner, params.assets, params.shares);
@@ -450,7 +443,7 @@ contract AaveAutopilot is
      * @return healthFactor The current health factor (scaled by 1e18)
      */
     function getCurrentHealthFactor() public view returns (uint256 healthFactor) {
-        ( , , , , , healthFactor) = aaveDataProvider.getUserAccountData(address(this));
+        ( , , , , , healthFactor) = AAVE_DATA_PROVIDER.getUserAccountData(address(this));
         return healthFactor;
     }
     
@@ -460,7 +453,7 @@ contract AaveAutopilot is
      * @return The health factor (scaled by 1e18, >1 means safe, <1 means at risk)
      */
     function _getHealthFactorView(address user) internal view returns (uint256) {
-        ( , , , , , uint256 healthFactor) = aaveDataProvider.getUserAccountData(user);
+        ( , , , , , uint256 healthFactor) = AAVE_DATA_PROVIDER.getUserAccountData(user);
         return healthFactor;
     }
     
@@ -519,7 +512,7 @@ contract AaveAutopilot is
             data.currentLiquidationThreshold,
             data.ltv,
             data.healthFactor
-        ) = aaveDataProvider.getUserAccountData(user);
+        ) = AAVE_DATA_PROVIDER.getUserAccountData(user);
         return data;
     }
     
@@ -562,10 +555,10 @@ contract AaveAutopilot is
         
         // Call the library function to handle the rebalancing
         uint256 newHealthFactor = AaveLib.rebalancePosition(
-            aavePool,
-            aaveDataProvider,
+            AAVE_POOL,
+            AAVE_DATA_PROVIDER,
             asset(),
-            ethUsdPriceFeed,
+            ETH_USD_PRICE_FEED,
             address(this)
         );
         
@@ -618,6 +611,6 @@ contract AaveAutopilot is
         uint256 amount
     ) external onlyOwner {
         require(tokenAddress != address(asset()), "Cannot recover underlying asset");
-        IERC20(tokenAddress).transfer(to, amount);
+        SafeERC20.safeTransfer(IERC20(tokenAddress), to, amount);
     }
 }

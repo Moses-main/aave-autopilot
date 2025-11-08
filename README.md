@@ -168,6 +168,7 @@ To test against the Sepolia testnet:
    # Required variables:
    RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_API_KEY
    PRIVATE_KEY=your_private_key_with_0x_prefix
+   ETHERSCAN_API_KEY=your_etherscan_api_key
    ```
 
 3. **Deploy the contract**:
@@ -213,15 +214,15 @@ To test against the Sepolia testnet:
    ```
 
 6. **Current Deployment**:
-   - **Contract Address**: [0xA076ecA49434a4475a9FF716c2E9f20ccc453c20](https://sepolia.etherscan.io/address/0xA076ecA49434a4475a9FF716c2E9f20ccc453c20)
+   - **Contract Address**: [0x4e9A9676b3E24E406a42710A06120561D5A9A045](https://sepolia.etherscan.io/address/0x4e9A9676b3E24E406a42710A06120561D5A9A045)
    - **Network**: Ethereum Sepolia Testnet (Chain ID: 11155111)
-   - **Explorer**: [View on Sepolia Etherscan](https://sepolia.etherscan.io/address/0xA076ecA49434a4475a9FF716c2E9f20ccc453c20)
+   - **Explorer**: [View on Sepolia Etherscan](https://sepolia.etherscan.io/address/0x4e9A9676b3E24E406a42710A06120561D5A9A045)
    - **Aave V3 Pool**: [0x6Ae43d3...](https://sepolia.etherscan.io/address/0x6Ae43d3271fF6888e7Fc43Fd7321a503fF738951)
    - **Chainlink Keeper Registry**: [0xE16Df59B...](https://sepolia.etherscan.io/address/0xE16Df59B887e3Caa439E0b29B42bA2e7976FD8b2)
    - **LINK Token**: [0x779877A7...](https://sepolia.etherscan.io/address/0x779877A7B0D9E8603169DdbD7836e478b4624789)
    - **USDC Token**: [0x94a9D9AC...](https://sepolia.etherscan.io/address/0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8)
    - **aUSDC Token**: [0x16dA4541...](https://sepolia.etherscan.io/address/0x16dA4541aD1807f4443d92D26044C1147406EB10)
-   - **Deployment TX**: [View on Etherscan](https://sepolia.etherscan.io/address/0xA076ecA49434a4475a9FF716c2E9f20ccc453c20)
+   - **Deployment TX**: [View on Etherscan](https://sepolia.etherscan.io/tx/0xfd995a27ef91a2322f4a4ea67f2b6689a1594111defe6fe9ad09e216e61f5750)
 
 ## Chainlink Automation Setup
 
@@ -336,22 +337,12 @@ The AAVE Autopilot Vault provides a simple interface for users to deposit USDC, 
 - **Chainlink Price Feeds**: Uses real-time ETH/USD price data for accurate collateral valuation
 - **Chainlink Keepers Integration**: Automated rebalancing when health factor falls below threshold (1.1x)
 - **Gas Optimization**: Optimized for network's gas efficiency with minimal external calls
-- **Security First**: Implements reentrancy protection, pausable functionality, and access control
-- **ERC-4626 Standard**: Fully compliant with the ERC-4626 tokenized vault standard
-- **Comprehensive Testing**: Extensive test suite covering edge cases and security scenarios
-- **Ethereum Sepolia Ready**: Pre-configured for Ethereum Sepolia testnet with easy mainnet deployment
-
-## 🚀 Project Status
-
-### Current Stage: Beta (Tenderly Fork)
-
-- **Deployed Contract Address (Tenderly Fork)**: [`0xaFf8c2337df3A7ce17525E6aa1BABCbb926F1421`](https://dashboard.tenderly.co/contract/mainnet/0xaFf8c2337df3A7ce17525E6aa1BABCbb926F1421)
 - **Test Coverage**: 85%+
 - **Audit Status**: Pending
 - **Mainnet Readiness**: Under Review
 
 ### Previous Deployments
-- **Sepolia Testnet**: [`0xaE2202566bE5325e2A5746b66E13F0D6f7E248b6`](https://sepolia.etherscan.io/address/0xaE2202566bE5325e2A5746b66E13F0D6f7E248b6)
+- **Sepolia Testnet (Previous)**: [`0xA076ecA49434a4475a9FF716c2E9f20ccc453c20`](https://sepolia.etherscan.io/address/0xA076ecA49434a4475a9FF716c2E9f20ccc453c20)
 
 ### Key Milestones
 
@@ -430,14 +421,15 @@ ETH_USD_PRICE_FEED=0x71041DDDAd094AE566B4d4cd0FA6C97e45B01E60
 #### Sepolia ETH
 
 ```
-Contract Address: 0xaE2202566bE5325e2A5746b66E13F0D6f7E248b6
+Contract Address: 0x4e9A9676b3E24E406a42710A06120561D5A9A045
 Constructor Parameters:
-  - USDC: 0x036CbD53842c5426634e7929541eC2318f3dCF7e
-  - AAVE_POOL: 0x6dcb6D1E0D487EDAE6B45D1d1B86e1A4AD8d4a2C
-  - AAVE_DATA_PROVIDER: 0x2d8A3C5677189723C4cB8873CfC9C8976FDF38Ac
-  - A_USDC: 0x4C5aE35b3f16fAcaA5a41f4Ba145D9aD887e8a5a
-  - ETH_USD_PRICE_FEED: 0x71041DDDAd094AE566B4d4cd0FA6C97e45B01E60
-  - Keeper Registry: TBD
+  - USDC: 0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8
+  - AAVE_POOL: 0x6Ae43d3271fF6888e7Fc43Fd7321a503fF738951
+  - AAVE_DATA_PROVIDER: 0x9B2F5546AaE6fC2eE3BEaD55c59eB7eD8648aFe1
+  - A_USDC: 0x16dA4541aD1807f4443d92D26044C1147406EB10
+  - ETH_USD_PRICE_FEED: 0x694AA1769357215DE4FAC081bf1f309aDC325306
+  - Keeper Registry: 0xE16Df59B887e3Caa439E0b29B42bA2e7976FD8b2
+  - LINK Token: 0x779877A7B0D9E8603169DdbD7836e478b4624789
   - Keeper Update Interval: 1 hour
   - Health Factor Target: 1.5x
   - Health Factor Threshold: 1.1x

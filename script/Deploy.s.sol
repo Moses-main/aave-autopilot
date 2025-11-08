@@ -69,16 +69,18 @@ contract DeployScript is Script {
         
         // Deploy the AaveAutopilot contract
         AaveAutopilot aaveAutopilot = new AaveAutopilot(
-            IERC20(USDC), // USDC token
+            IERC20Metadata(USDC), // USDC token (now IERC20Metadata)
             "Aave Autopilot USDC", // Vault name
             "apUSDC", // Vault symbol
             AAVE_POOL, // Aave Pool
             AAVE_DATA_PROVIDER, // Aave Data Provider
             A_USDC, // aUSDC token
             ETH_USD_PRICE_FEED, // ETH/USD price feed
-            LINK_TOKEN, // LINK token for Chainlink Keepers
-            deployer // Owner
+            LINK_TOKEN // LINK token for Chainlink Keepers
         );
+        
+        // Transfer ownership to the deployer
+        aaveAutopilot.transferOwnership(deployer);
         
         // Grant keeper role to the Keeper Registry
         aaveAutopilot.grantRole(

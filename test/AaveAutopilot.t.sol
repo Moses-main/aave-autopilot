@@ -4,13 +4,12 @@ pragma solidity ^0.8.19;
 import "forge-std/Test.sol";
 import "../src/AaveAutopilot.sol";
 import "../src/interfaces/IAave.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ERC4626WithName} from "../src/ERC4626WithName.sol";
 
 // This test file uses mocks to test the AaveAutopilot contract
-// For integration tests with Sepolia testnet, see AaveAutopilotSepoliaFork.t.sol
 
 // Mock ERC20 token for testing
-contract MockERC20 is IERC20 {
+contract MockERC20 is IERC20, IERC20Metadata {
     string public name = "Mock USDC";
     string public symbol = "mUSDC";
     uint8 public decimals = 6;
@@ -82,10 +81,10 @@ contract MockAggregatorV3 {
 }
 
 // Mock ERC4626 contract for testing
-contract MockERC4626 is ERC4626 {
+contract MockERC4626 is ERC4626WithName {
     using SafeERC20 for IERC20;
     
-    constructor(IERC20 asset) ERC4626(asset) ERC20("Mock ERC4626", "mERC4626") {}
+    constructor(IERC20 asset) ERC4626WithName(IERC20Metadata(address(asset)), "Mock ERC4626", "mERC4626") {}
     
     function totalAssets() public view override returns (uint256) {
         return IERC20(asset()).balanceOf(address(this));
@@ -160,9 +159,12 @@ contract AaveAutopilotTest is Test {
             address(mockAaveDataProvider),
             address(mockAToken),
             address(ethUsdPriceFeed),
-            address(linkToken),
-            keeper
+            address(linkToken)
         );
+        
+        // Transfer ownership to the keeper
+        vm.prank(owner);
+        vault.transferOwnership(keeper);
         
         // Mint some LINK to the vault for testing
         linkToken.mint(address(vault), 10e18);
@@ -961,7 +963,7 @@ contract MockAavePool {
     mapping(address => uint256) public borrowBalances;
     
     function supply(address asset, uint256 amount, address onBehalfOf, uint16) external {
-        IERC20(asset).transferFrom(msg.sender, address(this), amount);
+        SafeERC20.safeTransferFrom(IERC20(asset), msg.sender, address(this), amount);
         supplyBalances[onBehalfOf] += amount;
         emit Supply(asset, amount, onBehalfOf, 0);
     }
@@ -969,7 +971,7 @@ contract MockAavePool {
     function withdraw(address asset, uint256 amount, address to) external returns (uint256) {
         require(supplyBalances[msg.sender] >= amount, "Insufficient balance");
         supplyBalances[msg.sender] -= amount;
-        IERC20(asset).transfer(to, amount);
+        SafeERC20.safeTransfer(IERC20(asset), to, amount);
         emit Withdraw(asset, amount, to);
         return amount;
     }
@@ -977,7 +979,7 @@ contract MockAavePool {
     function borrow(address asset, uint256 amount, uint256 interestRateMode, uint16, address onBehalfOf) external {
         // In a real implementation, this would check collateral and health factor
         borrowBalances[onBehalfOf] += amount;
-        IERC20(asset).transfer(onBehalfOf, amount);
+        SafeERC20.safeTransfer(IERC20(asset), onBehalfOf, amount);
         emit Borrow(asset, amount, interestRateMode, 0, onBehalfOf);
     }
     
@@ -987,7 +989,7 @@ contract MockAavePool {
         }
         require(borrowBalances[onBehalfOf] >= amount, "Repay amount exceeds debt");
         
-        IERC20(asset).transferFrom(msg.sender, address(this), amount);
+        SafeERC20.safeTransferFrom(IERC20(asset), msg.sender, address(this), amount);
         borrowBalances[onBehalfOf] -= amount;
         
         emit Repay(asset, amount, rateMode, onBehalfOf);

@@ -57,17 +57,20 @@ contract DeploySepolia is Script {
         vm.startBroadcast(deployerPrivateKey);
         
         // Deploy AaveAutopilot
+        console.log("Deploying AaveAutopilot...");
         AaveAutopilot vault = new AaveAutopilot(
-            IERC20(USDC),
-            "Aave Autopilot USDC",
-            "apUSDC",
-            AAVE_POOL, // Aave Pool address
+            IERC20Metadata(USDC), // USDC token (now IERC20Metadata)
+            "Aave Autopilot USDC", // Vault name
+            "apUSDC", // Vault symbol
+            AAVE_POOL, // Aave Pool
             AAVE_DATA_PROVIDER, // Aave Data Provider
-            A_USDC, // aUSDC Token
-            ETH_USD_PRICE_FEED, // ETH/USD Price Feed
-            LINK_TOKEN, // LINK Token for Chainlink Keepers
-            deployer // Use the deployer address as the owner
+            A_USDC, // aUSDC token
+            ETH_USD_PRICE_FEED, // ETH/USD price feed
+            LINK_TOKEN // LINK token for Chainlink Keepers
         );
+        
+        // Transfer ownership to the deployer
+        vault.transferOwnership(deployer);
         
         // Log deployment details
         console.log("\n=== Deployment Summary ===");

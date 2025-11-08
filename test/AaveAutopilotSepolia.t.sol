@@ -17,18 +17,16 @@ contract AaveAutopilotWrapper is AaveAutopilot {
         address _aaveDataProvider,
         address _aToken,
         address _ethUsdPriceFeed,
-        address _linkToken,
-        address _owner
+        address _linkToken
     ) AaveAutopilot(
-        _asset,
+        IERC20Metadata(address(_asset)),
         _name,
         _symbol,
         _aavePool,
         _aaveDataProvider,
         _aToken,
         _ethUsdPriceFeed,
-        _linkToken,
-        _owner
+        _linkToken
     ) {}
     
     // Wrapper to expose _getHealthFactorView for testing
@@ -65,14 +63,13 @@ contract AaveAutopilotSepoliaTest is Test {
         
         vault = new AaveAutopilotWrapper(
             IERC20(USDC),
-            "Aave Autopilot Vault",
-            "aapUSDC",
+            "Aave Autopilot USDC",
+            "apUSDC",
             AAVE_POOL,
             AAVE_DATA_PROVIDER,
             A_USDC,
             ETH_USD_PRICE_FEED,
-            LINK_TOKEN,
-            OWNER
+            LINK_TOKEN
         );
         
         // Transfer USDC to test user
