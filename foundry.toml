@@ -4,7 +4,7 @@ out = "out"
 libs = ["lib"]
 
 # Solidity compiler version
-solc_version = "0.8.21"
+solc_version = "0.8.19"
 
 # Enable the Solidity optimizer
 optimizer = true

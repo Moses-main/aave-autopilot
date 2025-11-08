@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -166,6 +166,56 @@ contract AaveAutopilot is
     // ============ Core ERC-4626 Functions ============
 
     /**
+     * @notice Deposit assets into the vault
+     * @param assets Amount of assets to deposit
+     * @param receiver Address to receive minted shares
+     * @return shares Amount of shares minted
+     */
+    function deposit(uint256 assets, address receiver) 
+        public 
+        override 
+        nonReentrant 
+        whenNotPaused 
+        returns (uint256) 
+    {
+        require(assets > 0, "Cannot deposit 0");
+        require(receiver != address(0), "Invalid receiver address");
+        
+        // Check allowance
+        uint256 allowance = IERC20(asset()).allowance(msg.sender, address(this));
+        require(allowance >= assets, "Insufficient allowance. Please approve first.");
+        
+        // Calculate shares (1:1 for now, can be changed for fee logic)
+        uint256 shares = previewDeposit(assets);
+        
+        // Call internal _deposit
+        _deposit(msg.sender, receiver, assets, shares);
+        
+        return shares;
+    }
+    
+    /**
+     * @notice Deposit assets into the vault with signature support
+     * @param assets Amount of assets to deposit
+     * @param receiver Address to receive minted shares
+     * @param owner Address that owns the assets
+     * @return shares Amount of shares minted
+     */
+    function deposit(uint256 assets, address receiver, address owner)
+        public
+        returns (uint256)
+    {
+        if (msg.sender != owner) {
+            uint256 allowed = allowance(owner, msg.sender);
+            if (allowed != type(uint256).max) {
+                require(allowed >= assets, "Insufficient allowance");
+                _approve(owner, msg.sender, allowed - assets);
+            }
+        }
+        return deposit(assets, receiver);
+    }
+
+    /**
      * @notice Total assets managed by the vault
      */
     // Update totalAssets to get real balance from Aave
@@ -176,26 +226,54 @@ contract AaveAutopilot is
     /**
      * @notice Deposit assets into the vault
      */
-    function _deposit(address caller, address receiver, uint256 assets, uint256 shares) 
+    function _deposit(
+        address caller,
+        address receiver,
+        uint256 assets,
+        uint256 shares
+    ) 
         internal 
         override 
         nonReentrant 
         whenNotPaused 
     {
-        require(assets > 0, "Cannot deposit 0");
-        require(shares > 0, "Invalid share amount");
+        DepositParams memory params = DepositParams({
+            caller: caller,
+            receiver: receiver,
+            assets: assets,
+            shares: shares
+        });
         
-        // First, transfer assets from the caller to this contract
-        SafeERC20.safeTransferFrom(IERC20(asset()), caller, address(this), assets);
+        _validateDeposit(params);
+        _executeDeposit(params);
+    }
+    
+    /**
+     * @dev Validate deposit parameters
+     */
+    function _validateDeposit(DepositParams memory params) internal pure {
+        require(params.assets > 0, "Cannot deposit 0");
+        require(params.shares > 0, "Invalid share amount");
+    }
+    
+    /**
+     * @dev Execute deposit
+     */
+    function _executeDeposit(DepositParams memory params) internal {
+        IERC20 token = IERC20(asset());
         
-        // Then supply to Aave
-        aavePool.supply(asset(), assets, address(this), 0);
+        // Transfer assets from caller to this contract
+        SafeERC20.safeTransferFrom(token, params.caller, address(this), params.assets);
         
-        // Finally, mint shares to the receiver
-        _mint(receiver, shares);
+        // Supply to Aave
+        aavePool.supply(asset(), params.assets, address(this), 0);
         
-        emit Deposit(caller, receiver, assets, shares);
-        emit Deposited(caller, receiver, assets, shares);
+        // Mint shares to receiver
+        _mint(params.receiver, params.shares);
+        
+        // Emit events
+        emit Deposit(params.caller, params.receiver, params.assets, params.shares);
+        emit Deposited(params.caller, params.receiver, params.assets, params.shares);
     }
 
     /**
@@ -214,19 +292,41 @@ contract AaveAutopilot is
         nonReentrant 
         whenNotPaused 
     {
-        require(assets > 0, "Cannot withdraw 0");
-        require(shares > 0, "Invalid share amount");
+        WithdrawParams memory params = WithdrawParams({
+            caller: caller,
+            receiver: receiver,
+            owner: owner,
+            assets: assets,
+            shares: shares
+        });
         
-        // Check health factor after withdrawal
-        uint256 healthFactor = getCurrentHealthFactor();
+        _validateWithdraw(params);
+        _executeWithdraw(params);
+    }
+    
+    /**
+     * @dev Validate withdrawal parameters
+     */
+    function _validateWithdraw(WithdrawParams memory params) internal view {
+        require(params.assets > 0, "Cannot withdraw 0");
+        require(params.shares > 0, "Invalid share amount");
+        
+        // Check health factor after withdrawal using view function to save gas
+        uint256 healthFactor = _getHealthFactorView(address(this));
         require(healthFactor >= AaveLib.MIN_HEALTH_FACTOR, "Withdrawal would make position unsafe");
-        
+    }
+    
+    /**
+     * @dev Execute withdrawal
+     */
+    function _executeWithdraw(WithdrawParams memory params) internal {
         // Withdraw from Aave
-        aavePool.withdraw(asset(), assets, address(this));
+        aavePool.withdraw(asset(), params.assets, address(this));
         
-        super._withdraw(caller, receiver, owner, assets, shares);
+        // Call parent contract's _withdraw
+        super._withdraw(params.caller, params.receiver, params.owner, params.assets, params.shares);
         
-        emit Withdrawn(caller, receiver, owner, assets, shares);
+        emit Withdrawn(params.caller, params.receiver, params.owner, params.assets, params.shares);
     }
 
             // ============ Chainlink Automation ============
@@ -295,42 +395,52 @@ contract AaveAutopilot is
         address[] memory users = abi.decode(performData, (address[]));
         
         for (uint256 i = 0; i < users.length; i++) {
-            address user = users[i];
-            uint256 oldHealthFactor = getHealthFactor(user);
-            
-            // Skip if user doesn't need rebalancing or has exceeded max attempts
-            if (oldHealthFactor >= AaveLib.KEEPER_THRESHOLD || 
-                oldHealthFactor == 0 || 
-                rebalanceAttempts[user] >= MAX_REBALANCE_ATTEMPTS) {
-                continue;
-            }
-            
-            try this._rebalancePosition(user) {
-                // Success - reset attempt counter
-                rebalanceAttempts[user] = 0;
-                emit PositionRebalanced(user, oldHealthFactor, getHealthFactor(user));
-                emit RebalanceAttempt(user, oldHealthFactor, getHealthFactor(user), true, "");
-            } catch Error(string memory reason) {
-                // Increment attempt counter on failure
-                rebalanceAttempts[user]++;
-                emit RebalanceAttempt(user, oldHealthFactor, 0, false, reason);
-                
-                if (rebalanceAttempts[user] >= MAX_REBALANCE_ATTEMPTS) {
-                    emit MaxAttemptsReached(user);
-                }
-            } catch (bytes memory) {
-                // Catch any other errors
-                rebalanceAttempts[user]++;
-                emit RebalanceAttempt(user, oldHealthFactor, 0, false, "Unknown error");
-                
-                if (rebalanceAttempts[user] >= MAX_REBALANCE_ATTEMPTS) {
-                    emit MaxAttemptsReached(user);
-                }
-            }
+            _processUser(users[i]);
         }
         
         // Update batch index for next run
         currentBatchIndex = (currentBatchIndex + 1) % 10;
+    }
+    
+    /**
+     * @dev Process a single user for rebalancing
+     * @param user The address of the user to process
+     */
+    function _processUser(address user) internal {
+        uint256 oldHealthFactor = getHealthFactor(user);
+        
+        // Skip if user doesn't need rebalancing or has exceeded max attempts
+        if (oldHealthFactor >= AaveLib.KEEPER_THRESHOLD || 
+            oldHealthFactor == 0 || 
+            rebalanceAttempts[user] >= MAX_REBALANCE_ATTEMPTS) {
+            return;
+        }
+        
+        try this._rebalancePosition(user) {
+            // Success - reset attempt counter
+            rebalanceAttempts[user] = 0;
+            uint256 newHealthFactor = getHealthFactor(user);
+            emit PositionRebalanced(user, oldHealthFactor, newHealthFactor);
+            emit RebalanceAttempt(user, oldHealthFactor, newHealthFactor, true, "");
+        } catch Error(string memory reason) {
+            // Increment attempt counter on failure
+            _handleRebalanceFailure(user, oldHealthFactor, reason);
+        } catch (bytes memory) {
+            // Catch any other errors
+            _handleRebalanceFailure(user, oldHealthFactor, "Unknown error");
+        }
+    }
+    
+    /**
+     * @dev Handle rebalance failure
+     */
+    function _handleRebalanceFailure(address user, uint256 oldHealthFactor, string memory reason) internal {
+        rebalanceAttempts[user]++;
+        emit RebalanceAttempt(user, oldHealthFactor, 0, false, reason);
+        
+        if (rebalanceAttempts[user] >= MAX_REBALANCE_ATTEMPTS) {
+            emit MaxAttemptsReached(user);
+        }
     }
     
     // ============ Health Factor Management ============
@@ -354,36 +464,78 @@ contract AaveAutopilot is
         return healthFactor;
     }
     
+    // Struct to hold Aave user account data
+    struct UserAccountData {
+        uint256 totalCollateralETH;
+        uint256 totalDebtETH;
+        uint256 availableBorrowsETH;
+        uint256 currentLiquidationThreshold;
+        uint256 ltv;
+        uint256 healthFactor;
+    }
+    
+    // Struct to hold deposit parameters
+    struct DepositParams {
+        address caller;
+        address receiver;
+        uint256 assets;
+        uint256 shares;
+    }
+    
+    // Struct to hold withdraw parameters
+    struct WithdrawParams {
+        address caller;
+        address receiver;
+        address owner;
+        uint256 assets;
+        uint256 shares;
+    }
+
     /**
      * @notice Get the current health factor for a user
      * @param user The address of the user
-     * @return The health factor (scaled by 1e18, >1 means safe, <1 means at risk)
+     * @return healthFactor The health factor (scaled by 1e18, >1 means safe, <1 means at risk)
      */
-    function getHealthFactor(address user) public returns (uint256) {
+    function getHealthFactor(address user) public returns (uint256 healthFactor) {
         if (user == address(0)) return 0;
         
         // Get user account data from Aave
-        (
-            uint256 totalCollateralETH,
-            uint256 totalDebtETH,
-            uint256 availableBorrowsETH,
-            uint256 currentLiquidationThreshold,
-            uint256 ltv,
-            uint256 healthFactor
-        ) = aaveDataProvider.getUserAccountData(user);
+        UserAccountData memory data = _getUserAccountData(user);
         
         // Emit an event with the account data for monitoring
+        _emitAccountData(user, data);
+        
+        return data.healthFactor;
+    }
+    
+    /**
+     * @dev Internal function to get user account data from Aave
+     */
+    function _getUserAccountData(address user) internal view returns (UserAccountData memory data) {
+        (
+            data.totalCollateralETH,
+            data.totalDebtETH,
+            data.availableBorrowsETH,
+            data.currentLiquidationThreshold,
+            data.ltv,
+            data.healthFactor
+        ) = aaveDataProvider.getUserAccountData(user);
+        return data;
+    }
+    
+    /**
+     * @dev Internal function to emit account data event
+     */
+    function _emitAccountData(address user, UserAccountData memory data) internal {
         emit AccountData(
             user,
-            totalCollateralETH,
-            totalDebtETH,
-            availableBorrowsETH,
-            currentLiquidationThreshold,
-            ltv,
-            healthFactor
+            data.totalCollateralETH,
+            data.totalDebtETH,
+            data.availableBorrowsETH,
+            data.currentLiquidationThreshold,
+            data.ltv,
+            data.healthFactor
         );
-        
-        return healthFactor;
     }
     
     

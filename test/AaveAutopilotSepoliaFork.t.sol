@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.19;
 
 // Fork testing for Sepolia testnet
 // To run: forge test --match-path test/AaveAutopilotSepoliaFork.t.sol -vvv --fork-url $RPC_URL
