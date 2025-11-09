@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.20;
 
 import {Script, console} from "forge-std/Script.sol";
 import "../src/AaveAutopilot.sol";
@@ -12,19 +12,19 @@ import "../src/interfaces/IAave.sol";
  */
 contract DeploySepolia is Script {
     // Sepolia addresses (as strings to avoid checksum issues)
-    string constant WETH_STR = "0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9"; // Sepolia WETH
+    string constant DAI_STR = "0xFF34B3d4Aee8ddCd6F9AFFFB6Fe49bD371b8a357"; // Sepolia DAI
     string constant AAVE_POOL_STR = "0x6Ae43d3271fF6888e7Fc43Fd7321a503fF738951"; // Aave V3 Pool
     string constant AAVE_DATA_PROVIDER_STR = "0x9B2F5546AaE6fC2eE3BEaD55c59eB7eD8648aFe1"; // Aave Data Provider
-    string constant A_WETH_STR = "0x5b071b590a59395fE4025E0f606B025984e40536"; // aWETH Token
+    string constant A_DAI_STR = "0x29598b72eb5CeFd686c86d1b7Fa0367188B847C3"; // aDAI Token
     string constant ETH_USD_PRICE_FEED_STR = "0x694AA1769357215DE4FAC081bf1f309aDC325306"; // Chainlink ETH/USD
     string constant KEEPER_REGISTRY_STR = "0xE16Df59B887e3Caa439E0b29B42bA2e7976FD8b2"; // Chainlink Keeper Registry 2.1
     string constant LINK_TOKEN_STR = "0x779877A7B0D9E8603169DdbD7836e478b4624789"; // LINK Token on Sepolia
     
     // Address variables
-    address WETH;
+    address DAI;
     address AAVE_POOL;
     address AAVE_DATA_PROVIDER;
-    address A_WETH;
+    address A_DAI;
     address ETH_USD_PRICE_FEED;
     address KEEPER_REGISTRY;
     address LINK_TOKEN;
@@ -35,10 +35,10 @@ contract DeploySepolia is Script {
     
     function run() external {
         // Parse all addresses from strings
-        WETH = vm.parseAddress(WETH_STR);
+        DAI = vm.parseAddress(DAI_STR);
         AAVE_POOL = vm.parseAddress(AAVE_POOL_STR);
         AAVE_DATA_PROVIDER = vm.parseAddress(AAVE_DATA_PROVIDER_STR);
-        A_WETH = vm.parseAddress(A_WETH_STR);
+        A_DAI = vm.parseAddress(A_DAI_STR);
         ETH_USD_PRICE_FEED = vm.parseAddress(ETH_USD_PRICE_FEED_STR);
         KEEPER_REGISTRY = vm.parseAddress(KEEPER_REGISTRY_STR);
         LINK_TOKEN = vm.parseAddress(LINK_TOKEN_STR);
@@ -57,20 +57,17 @@ contract DeploySepolia is Script {
         vm.startBroadcast(deployerPrivateKey);
         
         // Deploy AaveAutopilot
-        console.log("Deploying AaveAutopilot...");
         AaveAutopilot vault = new AaveAutopilot(
-            IERC20Metadata(WETH),  // _asset (WETH)
-            "Wrapped Ethereum Vault",  // _name
-            "wETH-VAULT",  // _symbol
-            AAVE_POOL,  // _aavePool
-            AAVE_DATA_PROVIDER,  // _aaveDataProvider
-            A_WETH,  // _aToken
-            ETH_USD_PRICE_FEED,  // _ethUsdPriceFeed
-            LINK_TOKEN  // _linkToken
+            IERC20(DAI),
+            "Aave Autopilot DAI",
+            "apDAI",
+            AAVE_POOL, // Aave Pool address
+            AAVE_DATA_PROVIDER, // Aave Data Provider
+            A_DAI, // aDAI Token
+            ETH_USD_PRICE_FEED, // ETH/USD Price Feed
+            LINK_TOKEN, // LINK Token for Chainlink Keepers
+            deployer // Use the deployer address as the owner
         );
-        
-        // Transfer ownership to the deployer
-        vault.transferOwnership(deployer);
         
         // Log deployment details
         console.log("\n=== Deployment Summary ===");
@@ -80,10 +77,10 @@ contract DeploySepolia is Script {
         
         // Verify critical configurations
         console.log("\n=== Configuration ===");
-        console.log("WETH Token:", WETH);
-        console.log("AAVE Pool:", AAVE_POOL);
-        console.log("AAVE Data Provider:", AAVE_DATA_PROVIDER);
-        console.log("aWETH Token:", A_WETH);
+        console.log("DAI Token:", DAI);
+        console.log("Aave Pool:", AAVE_POOL);
+        console.log("Aave Data Provider:", AAVE_DATA_PROVIDER);
+        console.log("aDAI Token:", A_DAI);
         console.log("ETH/USD Price Feed:", ETH_USD_PRICE_FEED);
         console.log("Chainlink Keeper Registry:", KEEPER_REGISTRY);
         console.log("LINK Token:", LINK_TOKEN);
@@ -101,13 +98,13 @@ contract DeploySepolia is Script {
         console.log("```bash");
         console.log(string(abi.encodePacked(
             "echo '{\"method\":\"constructor\",\"params\":[\"",
-            toChecksumAddress(WETH), 
-            "\",\"Wrapped Ethereum Vault\",\"wETH-VAULT\",\"",
+            toChecksumAddress(DAI), 
+            "\",\"Aave Autopilot DAI\",\"apDAI\",\"",
             toChecksumAddress(AAVE_POOL),
             "\",\"",
             toChecksumAddress(AAVE_DATA_PROVIDER),
             "\",\"",
-            toChecksumAddress(A_WETH),
+            toChecksumAddress(A_DAI),
             "\",\"",
             toChecksumAddress(ETH_USD_PRICE_FEED),
             "\",\"",
