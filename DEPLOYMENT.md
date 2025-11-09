@@ -1,6 +1,6 @@
 # AAVE Autopilot Vault - Deployment Guide
 
-This guide provides step-by-step instructions for deploying the AAVE Autopilot Vault to Ethereum Sepolia testnet.
+This guide provides step-by-step instructions for deploying the AAVE Autopilot Vault to Polygon Amoy testnet.
 
 ## Prerequisites
 
@@ -8,8 +8,8 @@ This guide provides step-by-step instructions for deploying the AAVE Autopilot V
    - [Foundry](https://book.getfoundry.org/getting-started/installation) installed
    - [Git](https://git-scm.com/downloads) installed
    - [Node.js](https://nodejs.org/) (v16+ recommended)
-   - A wallet with test ETH on Ethereum Sepolia (get some from [Alchemy Sepolia Faucet](https://sepoliafaucet.com/) or [Infura Faucet](https://www.infura.io/faucet))
-   - [Etherscan API Key](https://etherscan.io/myapikey) for contract verification
+   - A wallet with test MATIC on Polygon Amoy (get some from [Polygon Amoy Faucet](https://faucet.polygon.technology/))
+   - [Polygonscan API Key](https://polygonscan.com/register) for contract verification
 
 2. **Repository Setup**
    ```bash
@@ -25,13 +25,10 @@ This guide provides step-by-step instructions for deploying the AAVE Autopilot V
    ```bash
    # Deployment
    PRIVATE_KEY=your_wallet_private_key_here
-   RPC_URL=https://eth-sepolia.g.alchemy.com/v2/your-api-key  # Your Sepolia RPC URL
+   RPC_URL=https://rpc-amoy.polygon.technology/  # Polygon Amoy RPC URL
    
    # Verification
-   ETHERSCAN_API_KEY=your_etherscan_api_key_here
-   
-   # Optional: For mainnet deployment
-   # RPC_URL=https://eth-mainnet.g.alchemy.com/v2/your-api-key
+   POLYGONSCAN_API_KEY=your_polygonscan_api_key_here
    ```
 
    ⚠️ **Security Note**: Add `.env` to your `.gitignore` to prevent committing sensitive information.
@@ -48,34 +45,42 @@ forge test -vvv
 forge script script/Deploy.s.sol:DeployScript --rpc-url $RPC_URL -vvv
 ```
 
-### 2. Deploy to Base Sepolia (Testnet)
+### 2. Deploy to Polygon Amoy (Testnet)
 
 ```bash
 # Deploy the contract
-forge script script/Deploy.s.sol:DeployScript \
+forge script script/DeployAmoy.s.sol:DeployAmoy \
   --rpc-url $RPC_URL \
   --broadcast \
   --verify \
-  --verifier-url https://api-sepolia.basescan.org/api \
-  --etherscan-api-key $ETHERSCAN_API_KEY \
+  --etherscan-api-key $POLYGONSCAN_API_KEY \
   -vvvv
 ```
 
-### 3. Deploy to Base Mainnet
+### 3. Verify on Polygonscan (if needed)
 
 ```bash
-# Update RPC_URL in .env to mainnet
-# RPC_URL=https://mainnet.base.org
+# Save constructor arguments to a file
+echo '{
+  "_asset": "0x9c3C9283D3e44854697Cd22D3FAA240Cfb032889",
+  "_name": "Wrapped Matic Vault",
+  "_symbol": "WMATIC-VAULT",
+  "_aavePool": "0x6C9fB0D5bD9429eb9Cd96B85B81d872281771AB6",
+  "_aaveDataProvider": "0x2d8A3C5677189723C4cB8873CfC9C8976FDF38Af",
+  "_aToken": "0x1E4b7B4B2E4aB5eB8e0aF89840ac02c2458dEbd",
+  "_ethUsdPriceFeed": "0xd0D5e3DB44DE05E9F294BB0a3bEEaF030DE24Ada",
+  "_linkToken": "0x326C977E6efc84E512bB9C30f76E30c160eD06FB"
+}' > constructor-args.json
 
-# Deploy with verification
-forge script script/Deploy.s.sol:DeployScript \
-  --rpc-url $RPC_URL \
-  --broadcast \
-  --verify \
-  --verifier-url https://api.basescan.org/api \
-  --etherscan-api-key $ETHERSCAN_API_KEY \
-  -vvvv
-```
+# Run verification
+forge verify-contract \
+  --chain-id 80002 \
+  --num-of-optimizations 200 \
+  --watch \
+  --constructor-args $(cat constructor-args.json) \
+  --compiler-version v0.8.19 \
+  <YOUR_CONTRACT_ADDRESS> \
+  src/AaveAutopilot.sol:AaveAutopilot
 
 ## Post-Deployment
 

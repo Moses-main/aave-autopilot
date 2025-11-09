@@ -12,19 +12,19 @@ import "../src/interfaces/IAave.sol";
  */
 contract DeploySepolia is Script {
     // Sepolia addresses (as strings to avoid checksum issues)
-    string constant USDC_STR = "0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8"; // Sepolia USDC
+    string constant WETH_STR = "0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9"; // Sepolia WETH
     string constant AAVE_POOL_STR = "0x6Ae43d3271fF6888e7Fc43Fd7321a503fF738951"; // Aave V3 Pool
     string constant AAVE_DATA_PROVIDER_STR = "0x9B2F5546AaE6fC2eE3BEaD55c59eB7eD8648aFe1"; // Aave Data Provider
-    string constant A_USDC_STR = "0x16dA4541aD1807f4443d92D26044C1147406EB10"; // aUSDC Token
+    string constant A_WETH_STR = "0x5b071b590a59395fE4025E0f606B025984e40536"; // aWETH Token
     string constant ETH_USD_PRICE_FEED_STR = "0x694AA1769357215DE4FAC081bf1f309aDC325306"; // Chainlink ETH/USD
     string constant KEEPER_REGISTRY_STR = "0xE16Df59B887e3Caa439E0b29B42bA2e7976FD8b2"; // Chainlink Keeper Registry 2.1
     string constant LINK_TOKEN_STR = "0x779877A7B0D9E8603169DdbD7836e478b4624789"; // LINK Token on Sepolia
     
     // Address variables
-    address USDC;
+    address WETH;
     address AAVE_POOL;
     address AAVE_DATA_PROVIDER;
-    address A_USDC;
+    address A_WETH;
     address ETH_USD_PRICE_FEED;
     address KEEPER_REGISTRY;
     address LINK_TOKEN;
@@ -35,10 +35,10 @@ contract DeploySepolia is Script {
     
     function run() external {
         // Parse all addresses from strings
-        USDC = vm.parseAddress(USDC_STR);
+        WETH = vm.parseAddress(WETH_STR);
         AAVE_POOL = vm.parseAddress(AAVE_POOL_STR);
         AAVE_DATA_PROVIDER = vm.parseAddress(AAVE_DATA_PROVIDER_STR);
-        A_USDC = vm.parseAddress(A_USDC_STR);
+        A_WETH = vm.parseAddress(A_WETH_STR);
         ETH_USD_PRICE_FEED = vm.parseAddress(ETH_USD_PRICE_FEED_STR);
         KEEPER_REGISTRY = vm.parseAddress(KEEPER_REGISTRY_STR);
         LINK_TOKEN = vm.parseAddress(LINK_TOKEN_STR);
@@ -59,14 +59,14 @@ contract DeploySepolia is Script {
         // Deploy AaveAutopilot
         console.log("Deploying AaveAutopilot...");
         AaveAutopilot vault = new AaveAutopilot(
-            IERC20Metadata(USDC), // USDC token (now IERC20Metadata)
-            "Aave Autopilot USDC", // Vault name
-            "apUSDC", // Vault symbol
-            AAVE_POOL, // Aave Pool
-            AAVE_DATA_PROVIDER, // Aave Data Provider
-            A_USDC, // aUSDC token
-            ETH_USD_PRICE_FEED, // ETH/USD price feed
-            LINK_TOKEN // LINK token for Chainlink Keepers
+            IERC20Metadata(WETH),  // _asset (WETH)
+            "Wrapped Ethereum Vault",  // _name
+            "wETH-VAULT",  // _symbol
+            AAVE_POOL,  // _aavePool
+            AAVE_DATA_PROVIDER,  // _aaveDataProvider
+            A_WETH,  // _aToken
+            ETH_USD_PRICE_FEED,  // _ethUsdPriceFeed
+            LINK_TOKEN  // _linkToken
         );
         
         // Transfer ownership to the deployer
@@ -80,10 +80,10 @@ contract DeploySepolia is Script {
         
         // Verify critical configurations
         console.log("\n=== Configuration ===");
-        console.log("USDC Token:", USDC);
-        console.log("Aave Pool:", AAVE_POOL);
-        console.log("Aave Data Provider:", AAVE_DATA_PROVIDER);
-        console.log("aUSDC Token:", A_USDC);
+        console.log("WETH Token:", WETH);
+        console.log("AAVE Pool:", AAVE_POOL);
+        console.log("AAVE Data Provider:", AAVE_DATA_PROVIDER);
+        console.log("aWETH Token:", A_WETH);
         console.log("ETH/USD Price Feed:", ETH_USD_PRICE_FEED);
         console.log("Chainlink Keeper Registry:", KEEPER_REGISTRY);
         console.log("LINK Token:", LINK_TOKEN);
@@ -101,13 +101,13 @@ contract DeploySepolia is Script {
         console.log("```bash");
         console.log(string(abi.encodePacked(
             "echo '{\"method\":\"constructor\",\"params\":[\"",
-            toChecksumAddress(USDC), 
-            "\",\"Aave Autopilot USDC\",\"apUSDC\",\"",
+            toChecksumAddress(WETH), 
+            "\",\"Wrapped Ethereum Vault\",\"wETH-VAULT\",\"",
             toChecksumAddress(AAVE_POOL),
             "\",\"",
             toChecksumAddress(AAVE_DATA_PROVIDER),
             "\",\"",
-            toChecksumAddress(A_USDC),
+            toChecksumAddress(A_WETH),
             "\",\"",
             toChecksumAddress(ETH_USD_PRICE_FEED),
             "\",\"",

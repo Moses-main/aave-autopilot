@@ -4,9 +4,9 @@
 [![Built with Foundry](https://img.shields.io/badge/Built%20with-Foundry-FFDB1C.svg)](https://getfoundry.sh/)
 
 > **Current Status**: In Development
-> - **Network**: Ethereum Sepolia Testnet (Chain ID: 11155111)
+> - **Network**: Polygon Amoy Testnet (Chain ID: 80002)
 > - **Status**: Core Implementation Complete
-> - **Last Updated**: 2025-11-08
+> - **Last Updated**: 2025-11-09
 
 An ERC-4626 vault that automates Aave v3 position management with Chainlink Automation to prevent liquidations.
 
